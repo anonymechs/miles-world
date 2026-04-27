@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Build a House — Miles & Daddy Thien</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
+
+    body {
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: #1a1a2e;
+      min-height: 100vh;
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      padding: 1.5rem 1rem 2rem;
+      color: #f0ece4;
+    }
+
+    #game-root {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1rem;
+      width: 100%;
+      max-width: 900px;
+    }
+
+    h1 {
+      font-size: 1.5rem;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      color: #f9c74f;
+      text-align: center;
+    }
+
+    h1 span { color: #f0ece4; font-weight: 400; font-size: 1rem; display: block; margin-top: 2px; }
+
+    /* HUD */
+    #hud {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      width: 100%;
+      background: #16213e;
+      border: 1px solid #2a2a4a;
+      border-radius: 12px;
+      padding: 0.75rem 1.25rem;
+      gap: 1rem;
+    }
+
+    .hud-block { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+    .hud-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: #8884a8; }
+    .hud-value { font-size: 1.6rem; font-weight: 700; color: #f0ece4; line-height: 1; }
+    #timer.urgent { color: #ef476f; }
+
+    #restart-btn {
+      padding: 8px 22px;
+      background: transparent;
+      border: 1.5px solid #4a4a7a;
+      border-radius: 8px;
+      color: #c8c4e8;
+      font-size: 13px;
+      font-family: inherit;
+      cursor: pointer;
+      transition: all 0.15s;
+      letter-spacing: 0.03em;
+    }
+    #restart-btn:hover { background: #2a2a4a; border-color: #7878b8; color: #f0ece4; }
+
+    /* Play area */
+    #play-area {
+      display: flex;
+      gap: 1.5rem;
+      width: 100%;
+      align-items: flex-start;
+    }
+
+    /* Brick panel */
+    #brick-panel {
+      width: 190px;
+      flex-shrink: 0;
+      background: #16213e;
+      border: 1px solid #2a2a4a;
+      border-radius: 12px;
+      padding: 1rem;
+    }
+
+    #brick-panel h3 {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #8884a8;
+      margin-bottom: 0.75rem;
+      font-weight: 500;
+    }
+
+    #brick-pool {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+    }
+
+    .source-brick {
+      width: 52px;
+      height: 22px;
+      background: linear-gradient(180deg, #d95f3b 0%, #b84a27 100%);
+      border: 1.5px solid #8b3210;
+      border-radius: 3px;
+      cursor: grab;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0;
+      transition: transform 0.1s, opacity 0.1s;
+      position: relative;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.12);
+    }
+    .source-brick::after {
+      content: '';
+      position: absolute;
+      inset: 3px 6px;
+      border-top: 1px solid rgba(255,255,255,0.15);
+    }
+    .source-brick:hover { transform: scale(1.05); }
+    .source-brick:active { cursor: grabbing; transform: scale(0.97); }
+    .source-brick.used { opacity: 0; pointer-events: none; }
+
+    /* House panel */
+    #house-panel {
+      flex: 1;
+      background: #16213e;
+      border: 1px solid #2a2a4a;
+      border-radius: 12px;
+      padding: 1rem;
+    }
+
+    #house-panel h3 {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #8884a8;
+      margin-bottom: 0.75rem;
+      font-weight: 500;
+    }
+
+    #house-canvas-wrap {
+      position: relative;
+      width: 100%;
+    }
+
+    #house-svg { width: 100%; display: block; }
+
+    /* Drag ghost */
+    #drag-ghost {
+      position: fixed;
+      width: 52px;
+      height: 22px;
+      background: linear-gradient(180deg, #d95f3b 0%, #b84a27 100%);
+      border: 1.5px solid #8b3210;
+      border-radius: 3px;
+      pointer-events: none;
+      z-index: 9999;
+      opacity: 0.9;
+      display: none;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+    }
+
+    /* Overlay */
+    #overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(10, 10, 30, 0.88);
+      border-radius: 8px;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 0.75rem;
+      backdrop-filter: blur(2px);
+    }
+    #overlay.show { display: flex; }
+    #overlay-icon { font-size: 3rem; }
+    #overlay-msg {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: #f9c74f;
+      text-align: center;
+      padding: 0 1.5rem;
+      letter-spacing: -0.02em;
+    }
+    #overlay-sub { font-size: 14px; color: #a8a4c8; }
+    #overlay-restart {
+      margin-top: 0.5rem;
+      padding: 10px 28px;
+      background: #f9c74f;
+      border: none;
+      border-radius: 8px;
+      color: #1a1a2e;
+      font-size: 14px;
+      font-family: inherit;
+      font-weight: 600;
+      cursor: pointer;
+      letter-spacing: 0.02em;
+      transition: transform 0.1s;
+    }
+    #overlay-restart:hover { transform: scale(1.04); }
+
+    /* Responsive */
+    @media (max-width: 600px) {
+      #play-area { flex-direction: column; }
+      #brick-panel { width: 100%; }
+      #brick-pool { justify-content: flex-start; }
+    }
+  </style>
+</head>
+<body>
+
+<div id="game-root">
+  <h1>Build a House 🏠 <span>Drag the bricks onto the house outline before time runs out!</span></h1>
+
+  <div id="hud">
+    <div class="hud-block">
+      <div class="hud-label">Time Left</div>
+      <div class="hud-value" id="timer">2:00</div>
+    </div>
+    <div class="hud-block">
+      <div class="hud-label">Bricks Placed</div>
+      <div class="hud-value" id="progress">0 / 50</div>
+    </div>
+    <button id="restart-btn">↺ Restart</button>
+  </div>
+
+  <div id="play-area">
+    <div id="brick-panel">
+      <h3>Your Bricks</h3>
+      <div id="brick-pool"></div>
+    </div>
+    <div id="house-panel">
+      <h3>House Outline</h3>
+      <div id="house-canvas-wrap">
+        <svg id="house-svg" viewBox="0 0 520 420" xmlns="http://www.w3.org/2000/svg"></svg>
+        <div id="overlay">
+          <div id="overlay-icon"></div>
+          <div id="overlay-msg"></div>
+          <div id="overlay-sub"></div>
+          <button id="overlay-restart">Play Again</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="drag-ghost"></div>
+
+<script>
+(function () {
+  const TOTAL_BRICKS = 50;
+  const GAME_DURATION = 120;
+  const SLOT_W = 56, SLOT_H = 21, GAP_X = 4, GAP_Y = 4;
+  const SVG_W = 520;
+  const NS = 'http://www.w3.org/2000/svg';
+
+  /* -- Build slot layout -- */
+  function buildSlots() {
+    const slots = [];
+
+    // Roof rows (pyramid)
+    const roofRows = [
+      { count: 2 }, { count: 4 }, { count: 6 }, { count: 8 }
+    ];
+    const roofStartY = 28;
+    const roofRowH = SLOT_H + GAP_Y;
+
+    roofRows.forEach((row, ri) => {
+      const totalW = row.count * SLOT_W + (row.count - 1) * GAP_X;
+      const startX = (SVG_W - totalW) / 2;
+      for (let i = 0; i < row.count; i++) {
+        slots.push({ x: startX + i * (SLOT_W + GAP_X), y: roofStartY + ri * roofRowH, section: 'roof' });
+      }
+    });
+
+    const wallStartY = roofStartY + roofRows.length * roofRowH + 8;
+    const wallTotalW = 8 * SLOT_W + 7 * GAP_X;
+    const wallStartX = (SVG_W - wallTotalW) / 2;
+    const wallRowCount = 5;
+
+    // Wall rows — skip door columns (3 & 4) on last row
+    for (let ri = 0; ri < wallRowCount; ri++) {
+      for (let ci = 0; ci < 8; ci++) {
+        const isDoorCol = (ci === 3 || ci === 4);
+        const isDoorRow = ri >= 3;
+        if (isDoorRow && isDoorCol) continue;
+        slots.push({
+          x: wallStartX + ci * (SLOT_W + GAP_X),
+          y: wallStartY + ri * (SLOT_H + GAP_Y),
+          section: 'wall'
+        });
+      }
+    }
+
+    const doorStartX = wallStartX + 3 * (SLOT_W + GAP_X);
+    const doorY0 = wallStartY + 3 * (SLOT_H + GAP_Y);
+    const doorW = 2 * SLOT_W + GAP_X;
+    const doorH = 2 * (SLOT_H + GAP_Y) - GAP_Y;
+
+    return { slots, wallStartX, wallTotalW, wallStartY, wallRowCount, doorStartX, doorY0, doorW, doorH, roofStartY, roofRows, roofRowH };
+  }
+
+  const layout = buildSlots();
+  let { slots } = layout;
+  // Trim to exactly 50
+  while (slots.length > TOTAL_BRICKS) slots.pop();
+
+  /* -- State -- */
+  let filled, timerInterval, timeLeft, gameOver, dragBrickId, slotEls, lastHighlight;
+
+  const svg      = document.getElementById('house-svg');
+  const ghost    = document.getElementById('drag-ghost');
+  const timerEl  = document.getElementById('timer');
+  const progEl   = document.getElementById('progress');
+  const overlay  = document.getElementById('overlay');
+  const oIcon    = document.getElementById('overlay-icon');
+  const oMsg     = document.getElementById('overlay-msg');
+  const oSub     = document.getElementById('overlay-sub');
+
+  /* -- Helpers -- */
+  function fmt(s) {
+    return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
+  }
+
+  function svgEl(tag, attrs) {
+    const el = document.createElementNS(NS, tag);
+    Object.entries(attrs).forEach(([k, v]) => el.setAttribute(k, v));
+    return el;
+  }
+
+  /* -- Draw house -- */
+  function drawHouse() {
+    svg.innerHTML = '';
+    const { wallStartX, wallTotalW, wallStartY, wallRowCount, doorStartX, doorY0, doorW, doorH, roofStartY, roofRows, roofRowH } = layout;
+
+    // Sky background tint
+    svg.appendChild(svgEl('rect', { x: 0, y: 0, width: 520, height: 420, fill: '#0f1729' }));
+
+    // Stars
+    [[60,30],[180,15],[420,25],[480,60],[50,80],[390,10],[300,40]].forEach(([x,y]) => {
+      svg.appendChild(svgEl('circle', { cx: x, cy: y, r: 1.5, fill: '#f9c74f', opacity: 0.6 }));
+    });
+
+    // Ground
+    svg.appendChild(svgEl('rect', { x: 0, y: 400, width: 520, height: 20, fill: '#2a3a2a' }));
+    svg.appendChild(svgEl('rect', { x: wallStartX - 16, y: 398, width: wallTotalW + 32, height: 4, fill: '#3a5a3a', rx: 2 }));
+
+    // Chimney
+    const chimX = SVG_W / 2 + 50, chimTopY = roofStartY - 40;
+    svg.appendChild(svgEl('rect', { x: chimX, y: chimTopY, width: 22, height: 50, fill: '#8b4513', stroke: '#5a2d0c', 'stroke-width': 1, rx: 2 }));
+    // Smoke puffs
+    [0, 1, 2].forEach(i => {
+      svg.appendChild(svgEl('circle', { cx: chimX + 11, cy: chimTopY - 10 - i * 14, r: 5 - i, fill: '#888', opacity: 0.25 - i * 0.06 }));
+    });
+
+    // Roof silhouette (triangle + overhang)
+    const roofLastY = roofStartY + roofRows.length * roofRowH - GAP_Y;
+    const roofW = roofRows[roofRows.length - 1].count * SLOT_W + (roofRows[roofRows.length - 1].count - 1) * GAP_X;
+    const roofLeftX  = (SVG_W - roofW) / 2 - 14;
+    const roofRightX = (SVG_W + roofW) / 2 + 14;
+    const roofApex   = SVG_W / 2;
+    const roofApexY  = roofStartY - 10;
+    svg.appendChild(svgEl('polygon', {
+      points: `${roofApex},${roofApexY} ${roofRightX},${roofLastY + SLOT_H + 6} ${roofLeftX},${roofLastY + SLOT_H + 6}`,
+      fill: '#16213e', stroke: '#4a4a7a', 'stroke-width': 1.5
+    }));
+
+    // Windows
+    function drawWindow(wx, wy) {
+      svg.appendChild(svgEl('rect', { x: wx, y: wy, width: 46, height: 36, fill: '#1a3a5c', stroke: '#2a5a8c', 'stroke-width': 1, rx: 3 }));
+      // Glow
+      svg.appendChild(svgEl('rect', { x: wx + 2, y: wy + 2, width: 42, height: 32, fill: '#f9c74f', rx: 2, opacity: 0.08 }));
+      // Panes
+      svg.appendChild(svgEl('line', { x1: wx, y1: wy + 18, x2: wx + 46, y2: wy + 18, stroke: '#2a5a8c', 'stroke-width': 0.75 }));
+      svg.appendChild(svgEl('line', { x1: wx + 23, y1: wy, x2: wx + 23, y2: wy + 36, stroke: '#2a5a8c', 'stroke-width': 0.75 }));
+      // Sill
+      svg.appendChild(svgEl('rect', { x: wx - 3, y: wy + 36, width: 52, height: 5, fill: '#4a4a6a', rx: 1 }));
+    }
+    drawWindow(wallStartX + 8, wallStartY + 10);
+    drawWindow(wallStartX + wallTotalW - 54, wallStartY + 10);
+
+    // Door
+    svg.appendChild(svgEl('rect', { x: doorStartX, y: doorY0, width: doorW, height: doorH + SLOT_H + 4, fill: '#3a1a0a', stroke: '#5a2d0c', 'stroke-width': 1.5, rx: 3 }));
+    svg.appendChild(svgEl('rect', { x: doorStartX + 4, y: doorY0 + 4, width: doorW / 2 - 8, height: 20, fill: '#5a2d0c', rx: 2, opacity: 0.5 }));
+    svg.appendChild(svgEl('rect', { x: doorStartX + doorW / 2 + 4, y: doorY0 + 4, width: doorW / 2 - 8, height: 20, fill: '#5a2d0c', rx: 2, opacity: 0.5 }));
+    svg.appendChild(svgEl('circle', { cx: doorStartX + doorW - 8, cy: doorY0 + doorH / 2, r: 4, fill: '#f9c74f' }));
+
+    // Brick slots
+    slotEls = [];
+    slots.forEach((s, i) => {
+      const isFilled = filled[i];
+      const rect = svgEl('rect', {
+        x: s.x, y: s.y, width: SLOT_W, height: SLOT_H, rx: 3,
+        fill: isFilled ? (s.section === 'roof' ? '#b84a27' : '#c05030') : '#1e2e4e',
+        stroke: isFilled ? '#7a2a10' : '#2a3a6e',
+        'stroke-width': isFilled ? 1.5 : 1,
+        'data-slot': i,
+        class: 'slot' + (isFilled ? ' filled' : '')
+      });
+      if (isFilled) {
+        // Brick mortar line
+        const line = svgEl('line', { x1: s.x + 8, y1: s.y + SLOT_H / 2, x2: s.x + SLOT_W - 8, y2: s.y + SLOT_H / 2, stroke: 'rgba(0,0,0,0.2)', 'stroke-width': 0.5 });
+        svg.appendChild(line);
+        const shine = svgEl('rect', { x: s.x + 3, y: s.y + 3, width: SLOT_W - 6, height: 3, fill: 'rgba(255,255,255,0.07)', rx: 1 });
+        svg.appendChild(shine);
+      }
+      svg.appendChild(rect);
+      slotEls.push(rect);
+    });
+  }
+
+  /* -- Brick pool -- */
+  function buildPool() {
+    const pool = document.getElementById('brick-pool');
+    pool.innerHTML = '';
+    for (let i = 0; i < TOTAL_BRICKS; i++) {
+      const b = document.createElement('div');
+      b.className = 'source-brick' + (filled[i] ? ' used' : '');
+      b.dataset.brickId = i;
+      b.addEventListener('mousedown', onMouseDown);
+      b.addEventListener('touchstart', onTouchStart, { passive: false });
+      pool.appendChild(b);
+    }
+  }
+
+  /* -- Drag -- */
+  function startDrag(id, cx, cy) {
+    dragBrickId = id;
+    ghost.style.display = 'block';
+    moveGhost(cx, cy);
+  }
+
+  function moveGhost(cx, cy) {
+    ghost.style.left = (cx - 26) + 'px';
+    ghost.style.top  = (cy - 11) + 'px';
+  }
+
+  function onMouseDown(e) {
+    if (gameOver) return;
+    startDrag(+e.currentTarget.dataset.brickId, e.clientX, e.clientY);
+    e.preventDefault();
+  }
+
+  function onTouchStart(e) {
+    if (gameOver) return;
+    const t = e.touches[0];
+    startDrag(+e.currentTarget.dataset.brickId, t.clientX, t.clientY);
+    e.preventDefault();
+  }
+
+  document.addEventListener('mousemove', e => {
+    if (dragBrickId === null) return;
+    moveGhost(e.clientX, e.clientY);
+    highlightSlot(e.clientX, e.clientY);
+  });
+
+  document.addEventListener('touchmove', e => {
+    if (dragBrickId === null) return;
+    const t = e.touches[0];
+    moveGhost(t.clientX, t.clientY);
+    highlightSlot(t.clientX, t.clientY);
+    e.preventDefault();
+  }, { passive: false });
+
+  document.addEventListener('mouseup', e  => { if (dragBrickId !== null) dropAt(e.clientX, e.clientY); });
+  document.addEventListener('touchend', e => { if (dragBrickId !== null) { const t = e.changedTouches[0]; dropAt(t.clientX, t.clientY); }});
+
+  function getSlotAt(cx, cy) {
+    const bbox = svg.getBoundingClientRect();
+    const sx = (cx - bbox.left) * (520 / bbox.width);
+    const sy = (cy - bbox.top)  * (420 / bbox.height);
+    for (let i = 0; i < slots.length; i++) {
+      const s = slots[i];
+      if (!filled[i] && sx >= s.x && sx <= s.x + SLOT_W && sy >= s.y && sy <= s.y + SLOT_H) return i;
+    }
+    return -1;
+  }
+
+  lastHighlight = -1;
+  function highlightSlot(cx, cy) {
+    const idx = getSlotAt(cx, cy);
+    if (idx === lastHighlight) return;
+    if (lastHighlight >= 0 && slotEls[lastHighlight]) {
+      slotEls[lastHighlight].setAttribute('stroke', '#2a3a6e');
+      slotEls[lastHighlight].setAttribute('stroke-width', 1);
+    }
+    if (idx >= 0 && slotEls[idx]) {
+      slotEls[idx].setAttribute('stroke', '#f9c74f');
+      slotEls[idx].setAttribute('stroke-width', 2);
+    }
+    lastHighlight = idx;
+  }
+
+  function dropAt(cx, cy) {
+    ghost.style.display = 'none';
+    if (lastHighlight >= 0 && slotEls[lastHighlight]) {
+      slotEls[lastHighlight].setAttribute('stroke', '#2a3a6e');
+      slotEls[lastHighlight].setAttribute('stroke-width', 1);
+    }
+    lastHighlight = -1;
+
+    const idx = getSlotAt(cx, cy);
+    if (idx >= 0 && !filled[idx]) {
+      filled[idx] = true;
+      const s = slots[idx];
+      const rect = slotEls[idx];
+      rect.setAttribute('fill', s.section === 'roof' ? '#b84a27' : '#c05030');
+      rect.setAttribute('stroke', '#7a2a10');
+      rect.setAttribute('stroke-width', 1.5);
+
+      // Add mortar line & shine
+      const line = svgEl('line', { x1: s.x + 8, y1: s.y + SLOT_H / 2, x2: s.x + SLOT_W - 8, y2: s.y + SLOT_H / 2, stroke: 'rgba(0,0,0,0.2)', 'stroke-width': 0.5 });
+      svg.insertBefore(line, rect);
+      const shine = svgEl('rect', { x: s.x + 3, y: s.y + 3, width: SLOT_W - 6, height: 3, fill: 'rgba(255,255,255,0.07)', rx: 1 });
+      svg.insertBefore(shine, rect);
+
+      // Hide source brick
+      const bEl = document.querySelector(`[data-brick-id="${dragBrickId}"]`);
+      if (bEl) bEl.classList.add('used');
+
+      updateProgress();
+    }
+    dragBrickId = null;
+  }
+
+  /* -- Progress & end -- */
+  function updateProgress() {
+    const count = filled.filter(Boolean).length;
+    progEl.textContent = count + ' / ' + TOTAL_BRICKS;
+    if (count >= TOTAL_BRICKS) endGame('win');
+  }
+
+  function endGame(result) {
+    if (gameOver) return;
+    gameOver = true;
+    clearInterval(timerInterval);
+    overlay.classList.add('show');
+    if (result === 'win') {
+      oIcon.textContent = '🎉';
+      oMsg.textContent = 'You Win Miles & Daddy Thien!';
+      oSub.textContent = 'The house is built — amazing teamwork!';
+    } else {
+      oIcon.textContent = '⏰';
+      oMsg.textContent = "Time's up!";
+      oSub.textContent = 'So close! Give it another go?';
+    }
+  }
+
+  /* -- Timer -- */
+  function startTimer() {
+    timerInterval = setInterval(() => {
+      timeLeft--;
+      timerEl.textContent = fmt(timeLeft);
+      if (timeLeft <= 20) timerEl.classList.add('urgent');
+      else timerEl.classList.remove('urgent');
+      if (timeLeft <= 0) endGame('lose');
+    }, 1000);
+  }
+
+  /* -- Init / Restart -- */
+  function init() {
+    clearInterval(timerInterval);
+    gameOver = false;
+    dragBrickId = null;
+    lastHighlight = -1;
+    timeLeft = GAME_DURATION;
+    filled = new Array(slots.length).fill(false);
+    timerEl.textContent = fmt(timeLeft);
+    timerEl.classList.remove('urgent');
+    progEl.textContent = '0 / ' + TOTAL_BRICKS;
+    overlay.classList.remove('show');
+    ghost.style.display = 'none';
+    drawHouse();
+    buildPool();
+    startTimer();
+  }
+
+  document.getElementById('restart-btn').addEventListener('click', init);
+  document.getElementById('overlay-restart').addEventListener('click', init);
+
+  init();
+})();
+</script>
+</body>
+</html>
