@@ -9,8 +9,8 @@
     sans-serif;
   line-height: 1.4;
   font-weight: 400;
-  color: #0f172a;
-  background-color: #f8fafc;
+  color: #1b120b;
+  background-color: #fd6116;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -24,4 +24,8 @@
 body {
   margin: 0;
   min-height: 100vh;
+}
+
+a {
+  color: inherit;
 }
