@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Travel Snake — Around the Countries</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<header class="topbar">
+  <h1>Travel<span>Snake</span></h1>
+  <div class="target">
+    <span class="target-label">Next stop</span>
+    <span id="target-flag" class="target-flag"></span>
+    <span id="target" class="target-name">—</span>
+  </div>
+  <div class="controls">
+    <button id="btn-pause" type="button">⏸ Pause</button>
+    <button id="btn-restart" type="button">⟲ Restart</button>
+  </div>
+</header>
+
+<main class="layout">
+  <section id="stage" class="stage">
+    <canvas id="game" width="960" height="480"></canvas>
+    <div id="overlay" class="overlay">
+      <h2 id="overlay-title">Travel Snake</h2>
+      <p id="overlay-text"></p>
+      <p id="overlay-stats" class="stats"></p>
+      <button id="overlay-btn" type="button">Start travelling</button>
+    </div>
+  </section>
+
+  <aside class="panel" id="panel">
+    <div class="stat big">
+      <span class="stat-label">Score</span>
+      <strong id="score">0</strong>
+    </div>
+    <div class="stat big gold">
+      <span class="stat-label">High score</span>
+      <strong id="high">0</strong>
+    </div>
+    <div class="stat">
+      <span class="stat-label">Length</span>
+      <strong id="length">6</strong>
+    </div>
+    <div class="stat grow">
+      <span class="stat-label">Countries visited</span>
+      <strong id="progress">0 / 193</strong>
+      <div class="bar"><div id="progress-bar"></div></div>
+    </div>
+    <div class="stat grow">
+      <span class="stat-label">Recently eaten</span>
+      <ul id="recent" class="recent"></ul>
+    </div>
+  </aside>
+</main>
+
+<script src="vendor/three.min.js"></script>
+<script src="js/worldmap.js"></script>
+<script src="js/flags.js"></script>
+<script src="js/countries.js"></script>
+<script src="js/landmarks.js"></script>
+<script src="js/game.js"></script>
+</body>
+</html>

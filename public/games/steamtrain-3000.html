@@ -1,0 +1,2579 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+<title>Steamtrain 3000 — Christmas Express</title>
+<style>
+  :root{
+    --gold:#e8c15a;
+    --red:#c9202b;
+    --green:#1f8a4c;
+    --ink:#08101f;
+  }
+  *{ box-sizing:border-box; }
+  html,body{ margin:0; padding:0; width:100%; height:100%; overflow:hidden; background:#05080f; }
+  body{ font-family:"Trebuchet MS","Segoe UI",Helvetica,Arial,sans-serif; color:#fff; -webkit-user-select:none; user-select:none; }
+  #app{ position:fixed; inset:0; }
+  canvas{ display:block; width:100%; height:100%; }
+
+  /* ---------- HUD ---------- */
+  #hud{ position:fixed; inset:0; pointer-events:none; }
+
+  .panel{
+    background:linear-gradient(180deg, rgba(12,22,40,.86), rgba(6,12,24,.86));
+    border:1px solid rgba(232,193,90,.45);
+    border-radius:14px;
+    box-shadow:0 6px 24px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.08);
+    backdrop-filter:blur(6px);
+  }
+
+  #stats{ position:absolute; top:16px; left:16px; padding:12px 16px; min-width:210px; }
+  #stats .row{ display:flex; justify-content:space-between; align-items:baseline; gap:18px; margin:3px 0; }
+  #stats .label{ font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:#9fb4d4; }
+  #stats .val{ font-size:19px; font-weight:700; color:#fff; font-variant-numeric:tabular-nums; }
+  #stats .val.gold{ color:var(--gold); }
+  #title{ font-size:13px; letter-spacing:.2em; text-transform:uppercase; color:var(--gold);
+          border-bottom:1px solid rgba(232,193,90,.3); padding-bottom:7px; margin-bottom:8px; text-align:center; font-weight:700; }
+
+  /* cargo meter */
+  #cargoWrap{ margin-top:10px; }
+  #cargoBar{ height:9px; border-radius:6px; background:rgba(255,255,255,.12); overflow:hidden; border:1px solid rgba(255,255,255,.15); }
+  #cargoFill{ height:100%; width:0%; border-radius:6px; background:linear-gradient(90deg,#2fbf6a,#8fe36a,var(--gold)); transition:width .18s ease; }
+
+  #buttons{ position:absolute; top:16px; right:16px; display:flex; gap:8px; pointer-events:auto; }
+  button.btn{
+    pointer-events:auto; cursor:pointer; font-family:inherit; font-weight:700;
+    font-size:12px; letter-spacing:.11em; text-transform:uppercase;
+    color:#fff; padding:11px 15px; border-radius:11px;
+    border:1px solid rgba(232,193,90,.5);
+    background:linear-gradient(180deg,#1a3050,#0d1a2e);
+    box-shadow:0 4px 14px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.12);
+    transition:transform .08s ease, filter .15s ease;
+  }
+  button.btn:hover{ filter:brightness(1.25); }
+  button.btn:active{ transform:translateY(1px) scale(.98); }
+  button.btn.primary{ background:linear-gradient(180deg,#1f8a4c,#0f5c31); border-color:#8fe36a; }
+  button.btn.danger{ background:linear-gradient(180deg,#c9202b,#7d1219); border-color:#ff8a8a; }
+  button.btn[disabled]{ opacity:.4; cursor:default; filter:none; }
+
+  #hint{ position:absolute; bottom:18px; left:50%; transform:translateX(-50%);
+         font-size:12px; letter-spacing:.13em; text-transform:uppercase; color:#a9c0e0;
+         padding:9px 18px; text-align:center; }
+  #hint b{ color:var(--gold); }
+
+  /* split arrows */
+  #choice{ position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
+           display:flex; gap:min(28vw,320px); opacity:0; transition:opacity .18s ease; }
+  #choice.on{ opacity:1; }
+  #choice div{ font-size:56px; color:var(--gold); text-shadow:0 0 22px rgba(232,193,90,.75); animation:pulse 1s ease-in-out infinite; }
+  #choice div:last-child{ animation-delay:.5s; }
+  @keyframes pulse{ 0%,100%{ transform:scale(1); opacity:.55 } 50%{ transform:scale(1.22); opacity:1 } }
+
+  /* toast */
+  #toast{ position:absolute; top:26%; left:50%; transform:translate(-50%,0) scale(.85);
+          font-size:clamp(26px,5vw,54px); font-weight:800; letter-spacing:.06em; text-align:center;
+          color:var(--gold); text-shadow:0 0 30px rgba(232,193,90,.8), 0 6px 18px rgba(0,0,0,.7);
+          opacity:0; transition:opacity .25s ease, transform .25s ease; }
+  #toast.on{ opacity:1; transform:translate(-50%,0) scale(1); }
+  #toast small{ display:block; font-size:.42em; color:#fff; letter-spacing:.2em; margin-top:6px; font-weight:600; }
+
+  /* touch controls */
+  #touch{ position:absolute; bottom:0; left:0; right:0; height:38%; display:none; pointer-events:none; }
+  #touch .half{ position:absolute; bottom:0; width:50%; height:100%; pointer-events:auto; }
+  #touch .l{ left:0 } #touch .r{ right:0 }
+  @media (pointer:coarse){ #touch{ display:block } #hint{ font-size:10px } }
+
+  /* auto-aim reticle over the locked-on thief */
+  #reticle{ position:absolute; width:104px; height:104px; margin:-52px 0 0 -52px; display:none; }
+  #reticle svg{ width:100%; height:100%; overflow:visible; animation:spin 4s linear infinite; }
+  #reticle circle{ fill:none; stroke:#ff3524; stroke-width:7; stroke-dasharray:26 25; opacity:1;
+                   filter:drop-shadow(0 0 7px rgba(255,60,40,1)); }
+  #reticle path{ stroke:#ffd36a; stroke-width:8; stroke-linecap:round;
+                 filter:drop-shadow(0 0 4px rgba(255,180,80,.9)); }
+  @keyframes spin{ to{ transform:rotate(360deg) } }
+  /* armour pips: how many hits the locked thief has left */
+  #hp{ position:absolute; left:50%; top:-18px; transform:translateX(-50%); display:none;
+       gap:5px; }
+  #hp i{ width:11px; height:11px; border-radius:2px; background:#ff3524;
+         box-shadow:0 0 6px rgba(255,60,40,.9); border:1px solid rgba(255,255,255,.55); display:block; }
+  #hp i.spent{ background:rgba(255,255,255,.12); box-shadow:none; }
+
+  /* fire button (touch) */
+  #fireBtn{ position:absolute; bottom:74px; left:50%; transform:translateX(-50%);
+    display:none; pointer-events:auto; cursor:pointer; font-family:inherit; font-weight:800;
+    font-size:13px; letter-spacing:.16em; color:#fff; width:96px; height:96px; border-radius:50%;
+    border:2px solid rgba(255,210,120,.75);
+    background:radial-gradient(circle at 50% 35%, #d94a2a, #7d1219);
+    box-shadow:0 6px 20px rgba(0,0,0,.5), inset 0 2px 0 rgba(255,255,255,.25); }
+  #fireBtn:active{ transform:translateX(-50%) scale(.94); filter:brightness(1.2); }
+  @media (pointer:coarse){ #fireBtn{ display:block } }
+  body.touch #fireBtn{ display:block; }
+  body.touch #touch{ display:block; }
+
+  /* impact flash */
+  #flash{ position:fixed; inset:0; pointer-events:none; z-index:15; opacity:0;
+          background:radial-gradient(ellipse at 50% 62%, rgba(255,246,214,.95), rgba(255,142,40,.7) 32%, rgba(180,40,10,0) 68%); }
+  #flash.bang{ animation:bang .7s ease-out forwards; }
+  @keyframes bang{ 0%{ opacity:0 } 6%{ opacity:1 } 100%{ opacity:0 } }
+
+  /* narrow screens: stats stay left, controls stack down the right edge */
+  @media (max-width:760px){
+    #stats{ top:8px; left:8px; padding:9px 11px; min-width:0; width:148px; }
+    #stats .row{ gap:8px; margin:2px 0; }
+    #stats .label{ font-size:9px; letter-spacing:.08em; }
+    #stats .val{ font-size:15px; }
+    #title{ font-size:10px; padding-bottom:5px; margin-bottom:6px; }
+    #buttons{ top:8px; right:8px; flex-direction:column; gap:6px; }
+    button.btn{ padding:9px 10px; font-size:10px; letter-spacing:.06em; }
+    #choice{ gap:min(48vw,250px); }
+    #choice div{ font-size:38px; }
+    #hint{ bottom:10px; font-size:9px; padding:7px 12px; max-width:92vw; }
+    #toast{ top:20%; }
+    #card{ padding:26px 22px; }
+  }
+
+  /* ---------- overlay ---------- */
+  #overlay{ position:fixed; inset:0; display:flex; align-items:center; justify-content:center;
+            background:radial-gradient(ellipse at 50% 40%, rgba(20,40,72,.72), rgba(3,6,14,.94));
+            backdrop-filter:blur(3px); z-index:20; transition:opacity .3s ease; }
+  #overlay.hidden{ opacity:0; pointer-events:none; }
+  #card{ width:min(620px,92vw); padding:34px 38px; text-align:center; }
+  #card h1{ margin:0 0 4px; font-size:clamp(30px,6vw,50px); letter-spacing:.04em;
+            background:linear-gradient(180deg,#fff,var(--gold)); -webkit-background-clip:text; background-clip:text; color:transparent;
+            text-shadow:0 6px 26px rgba(0,0,0,.5); }
+  #card h2{ margin:0 0 20px; font-size:13px; letter-spacing:.34em; text-transform:uppercase; color:#8fe36a; font-weight:600; }
+  /* wrecked variant */
+  #card.wrecked{ border-color:rgba(255,120,90,.6); }
+  #card.wrecked h1{ background:linear-gradient(180deg,#fff0e0,#ff5a3c); -webkit-background-clip:text; background-clip:text; }
+  #card.wrecked h2{ color:#ff8a6a; }
+  #card.wrecked .lights i{ animation-duration:.5s; }
+  #card p{ color:#c3d4ec; font-size:14px; line-height:1.65; margin:0 auto 10px; max-width:460px; }
+  #card .keys{ display:flex; gap:10px; justify-content:center; flex-wrap:wrap; margin:18px 0 24px; }
+  #card .key{ font-size:11px; letter-spacing:.1em; text-transform:uppercase; color:#dfe9f8;
+              border:1px solid rgba(255,255,255,.22); background:rgba(255,255,255,.06);
+              padding:8px 12px; border-radius:9px; }
+  #card .key b{ color:var(--gold); }
+  #card .big{ pointer-events:auto; font-size:15px; padding:15px 40px; border-radius:13px; }
+  #finalScore{ display:none; margin:6px 0 18px; font-size:15px; color:var(--gold); letter-spacing:.1em; }
+  .lights{ display:flex; justify-content:center; gap:9px; margin-bottom:16px; }
+  .lights i{ width:11px; height:11px; border-radius:50%; display:block; animation:tw 1.6s infinite ease-in-out; }
+  @keyframes tw{ 0%,100%{ opacity:.28; transform:scale(.85) } 50%{ opacity:1; transform:scale(1.12) } }
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<div id="hud">
+  <div id="stats" class="panel">
+    <div id="title">Steamtrain 3000</div>
+    <div class="row"><span class="label">Score</span><span class="val gold" id="uiScore">0</span></div>
+    <div class="row"><span class="label">Presents</span><span class="val" id="uiPresents">0</span></div>
+    <div class="row"><span class="label">Thieves hit</span><span class="val" id="uiKills">0</span></div>
+    <div class="row"><span class="label">Distance</span><span class="val" id="uiDist">0 m</span></div>
+    <div class="row"><span class="label">Speed</span><span class="val" id="uiSpeed">0</span></div>
+    <div id="cargoWrap">
+      <div class="row"><span class="label">Cargo</span><span class="label" id="uiCargoTxt">0 / 32</span></div>
+      <div id="cargoBar"><div id="cargoFill"></div></div>
+    </div>
+  </div>
+
+  <div id="buttons">
+    <button class="btn primary" id="btnStart">Start</button>
+    <button class="btn" id="btnPause" disabled>Pause</button>
+    <button class="btn danger" id="btnReset">Reset</button>
+    <button class="btn" id="btnSound">&#9835; On</button>
+  </div>
+
+  <div id="choice"><div>&#9664;</div><div>&#9654;</div></div>
+  <div id="toast"></div>
+  <div id="hint" class="panel"><b>&#8592; &#8594;</b> steer &nbsp;&bull;&nbsp; <b>Space</b> fire the cannon &nbsp;&bull;&nbsp; avoid the <b style="color:#ff6a52">red beam</b> &nbsp;&bull;&nbsp; <b>P</b> pause</div>
+
+  <div id="reticle"><svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="34"/><path d="M50 2v18M50 80v18M2 50h18M80 50h18"/></svg><div id="hp"></div></div>
+
+  <div id="touch"><div class="half l"></div><div class="half r"></div></div>
+  <button id="fireBtn">FIRE</button>
+</div>
+
+<div id="flash"></div>
+
+<div id="overlay">
+  <div id="card" class="panel">
+    <div class="lights">
+      <i style="background:#ff4d4d;animation-delay:0s"></i><i style="background:#ffd24d;animation-delay:.2s"></i>
+      <i style="background:#5de06a;animation-delay:.4s"></i><i style="background:#4dc4ff;animation-delay:.6s"></i>
+      <i style="background:#ff4d4d;animation-delay:.8s"></i><i style="background:#ffd24d;animation-delay:1s"></i>
+      <i style="background:#5de06a;animation-delay:1.2s"></i>
+    </div>
+    <h1 id="cardTitle">Steamtrain&nbsp;3000</h1>
+    <h2 id="cardSub">The Christmas Express</h2>
+    <p id="cardText">Drive the Christmas Express through the winter night. Pick your path where the rails split, scoop up every present you can, and blast the thieves who come to rob your wagons. Boulders block a branch of every junction — hit one and the train is matchwood.</p>
+    <div id="finalScore"></div>
+    <div class="keys">
+      <span class="key"><b>&#8592; &#8594;</b> / <b>A D</b> &nbsp;steer at junctions</span>
+      <span class="key"><b>Space</b> / <b>F</b> &nbsp;fire the cannon</span>
+      <span class="key"><b>P</b> &nbsp;pause</span>
+      <span class="key"><b>R</b> &nbsp;reset</span>
+    </div>
+    <button class="btn primary big" id="btnGo">All Aboard</button>
+  </div>
+</div>
+
+<script type="importmap">
+{ "imports": { "three": "https://unpkg.com/three@0.161.0/build/three.module.js" } }
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+
+/* =====================================================================
+   Steamtrain 3000 — a Christmas train present-collecting runner
+   ===================================================================== */
+
+const clamp = (v,a,b)=> v<a?a:(v>b?b:v);
+const lerp  = (a,b,t)=> a+(b-a)*t;
+const smooth= t=> t*t*(3-2*t);
+const rand  = (a,b)=> a+Math.random()*(b-a);
+const randi = (a,b)=> Math.floor(rand(a,b+1));
+const pick  = arr => arr[Math.floor(Math.random()*arr.length)];
+
+/* ---------- tunables ---------- */
+const CFG = {
+  gauge: 2.0,
+  baseSpeed: 26,
+  maxSpeed: 111.1,         // 400 km/h
+  accelPerMetre: 0.0155,   // tops out around 5,500 m
+  lateralSpeed: 16,
+  viewAhead: 560,
+  viewBehind: 130,
+  splitLen: 58,
+  splitLockU: 0.46,
+  // thieves
+  raidStart: 500,          // metres before the first raider shows up
+  raidGapMin: 2.4, raidGapMax: 8,
+  maxPursuers: 7,
+  carHP: 2,                // hits to destroy a getaway car
+  truckHP: 4,              // hits to destroy a box truck
+  fireCooldown: 0.28,
+  gunRange: 140,
+  // The camera looks along +Z, so world +X renders to the LEFT of screen. Lane sets are
+  // therefore listed in descending X, which makes lane index 0 the leftmost branch on
+  // screen and index n-1 the rightmost — so pressing right really does go right.
+  laneSets: { 2:[8,-8], 3:[14,0,-14] },
+  cargoPerCar: 16
+};
+
+/* =====================================================================
+   Audio (tiny WebAudio synth, created on first gesture)
+   ===================================================================== */
+const Sfx = {
+  ctx:null, on:true, master:null,
+  init(){
+    if(this.ctx) return;
+    try{
+      this.ctx = new (window.AudioContext||window.webkitAudioContext)();
+      this.master = this.ctx.createGain();
+      this.master.gain.value = 0.25;
+      this.master.connect(this.ctx.destination);
+    }catch(e){ this.ctx=null; }
+  },
+  resume(){ if(this.ctx && this.ctx.state==='suspended') this.ctx.resume(); },
+  tone(freq, t0, dur, type='sine', vol=1, glideTo=null){
+    if(!this.ctx || !this.on) return;
+    const o = this.ctx.createOscillator(), g = this.ctx.createGain();
+    o.type = type; o.frequency.setValueAtTime(freq, t0);
+    if(glideTo) o.frequency.exponentialRampToValueAtTime(glideTo, t0+dur);
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(0.55*vol, t0+0.012);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0+dur);
+    o.connect(g); g.connect(this.master); o.start(t0); o.stop(t0+dur+0.05);
+  },
+  ding(pitch=0){
+    if(!this.ctx||!this.on) return; const t=this.ctx.currentTime;
+    const base = 900 * Math.pow(1.06, clamp(pitch,0,12));
+    this.tone(base, t, 0.22, 'sine', 0.9);
+    this.tone(base*1.5, t+0.005, 0.30, 'triangle', 0.45);
+  },
+  whistle(){
+    if(!this.ctx||!this.on) return; const t=this.ctx.currentTime;
+    this.tone(620, t, 0.75, 'sawtooth', 0.30, 520);
+    this.tone(930, t, 0.75, 'sawtooth', 0.22, 780);
+  },
+  jingle(){
+    if(!this.ctx||!this.on) return; const t=this.ctx.currentTime;
+    [523,659,784,1047].forEach((f,i)=> this.tone(f, t+i*0.11, 0.34, 'triangle', 0.8));
+  },
+  alarm(){
+    if(!this.ctx||!this.on) return; const t=this.ctx.currentTime;
+    this.tone(440, t, 0.22, 'square', 0.5, 620);
+    this.tone(440, t+0.26, 0.22, 'square', 0.5, 620);
+  },
+  steal(){
+    if(!this.ctx||!this.on) return; const t=this.ctx.currentTime;
+    this.tone(520, t, 0.18, 'sawtooth', 0.45, 190);   // a sad little downward slide
+  },
+  cannon(){
+    if(!this.ctx||!this.on) return;
+    const ctx=this.ctx, t=ctx.currentTime;
+    this.tone(320, t, 0.16, 'square', 0.7, 90);
+    if(!this.noiseBuf) this.makeNoise();
+    const src = ctx.createBufferSource(); src.buffer = this.noiseBuf;
+    const hp = ctx.createBiquadFilter(); hp.type='highpass'; hp.frequency.value = 900;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.5, t); g.gain.exponentialRampToValueAtTime(0.0001, t+0.18);
+    src.connect(hp); hp.connect(g); g.connect(this.master);
+    src.start(t); src.stop(t+0.2);
+  },
+  clang(){
+    if(!this.ctx||!this.on) return; const t=this.ctx.currentTime;
+    this.tone(1200, t, 0.09, 'square', 0.35, 700);   // metallic ding of a shell bouncing off
+    this.tone(2100, t, 0.06, 'triangle', 0.2, 1500);
+  },
+  noiseBuf:null,
+  makeNoise(){
+    const ctx = this.ctx, len = ctx.sampleRate * 2;
+    this.noiseBuf = ctx.createBuffer(1, len, ctx.sampleRate);
+    const d = this.noiseBuf.getChannelData(0);
+    for(let i=0;i<len;i++) d[i] = Math.random()*2-1;
+  },
+  explode(){
+    if(!this.ctx||!this.on) return;
+    const ctx = this.ctx, t = ctx.currentTime;
+    if(!this.noiseBuf) this.makeNoise();
+    // gritty blast
+    const src = ctx.createBufferSource(); src.buffer = this.noiseBuf;
+    const lp = ctx.createBiquadFilter(); lp.type='lowpass';
+    lp.frequency.setValueAtTime(2400, t); lp.frequency.exponentialRampToValueAtTime(120, t+1.5);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(1.4, t); g.gain.exponentialRampToValueAtTime(0.0001, t+1.7);
+    src.connect(lp); lp.connect(g); g.connect(this.master);
+    src.start(t); src.stop(t+1.8);
+    // the low thump underneath it
+    this.tone(150, t, 0.9, 'sine', 1.6, 28);
+    this.tone(90,  t+0.04, 1.2, 'triangle', 1.1, 22);
+  }
+};
+
+/* =====================================================================
+   Geometry helpers — everything is built from a unit box / shared prims
+   ===================================================================== */
+const UNIT_BOX = new THREE.BoxGeometry(1,1,1);
+const _m4 = new THREE.Matrix4(), _q = new THREE.Quaternion(),
+      _v = new THREE.Vector3(), _e = new THREE.Euler();
+
+/** merge {geo,matrix,color} parts into one vertex-coloured BufferGeometry */
+function mergeParts(parts){
+  let total = 0;
+  const prepared = [];
+  for(const p of parts){
+    const g = (p.geo.index ? p.geo.toNonIndexed() : p.geo).clone();
+    if(p.matrix) g.applyMatrix4(p.matrix);
+    prepared.push({g, color:p.color});
+    total += g.attributes.position.count;
+  }
+  const pos = new Float32Array(total*3), nor = new Float32Array(total*3), col = new Float32Array(total*3);
+  let o = 0;
+  const c = new THREE.Color();
+  for(const {g, color} of prepared){
+    const pa = g.attributes.position.array, na = g.attributes.normal.array, n = g.attributes.position.count;
+    pos.set(pa, o*3); nor.set(na, o*3);
+    c.set(color === undefined ? 0xffffff : color);
+    for(let i=0;i<n;i++){ col[(o+i)*3]=c.r; col[(o+i)*3+1]=c.g; col[(o+i)*3+2]=c.b; }
+    o += n; g.dispose();
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos,3));
+  geo.setAttribute('normal',   new THREE.BufferAttribute(nor,3));
+  geo.setAttribute('color',    new THREE.BufferAttribute(col,3));
+  return geo;
+}
+
+/** matrix for a box stretched between two points on the ground plane */
+function spanMatrix(x0,z0,x1,z1,w,h,y){
+  const dx=x1-x0, dz=z1-z0, len=Math.hypot(dx,dz) || 0.001;
+  _e.set(0, Math.atan2(dx,dz), 0);
+  _q.setFromEuler(_e);
+  return new THREE.Matrix4().compose(
+    new THREE.Vector3((x0+x1)*0.5, y, (z0+z1)*0.5), _q, new THREE.Vector3(w,h,len));
+}
+function boxMatrix(x,y,z,w,h,d,rx=0,ry=0,rz=0){
+  _e.set(rx,ry,rz); _q.setFromEuler(_e);
+  return new THREE.Matrix4().compose(new THREE.Vector3(x,y,z), _q, new THREE.Vector3(w,h,d));
+}
+
+/* canvas text texture for the "Merry Christmas" plaques */
+function plaqueTexture(text, bg='#0e6b3a'){
+  const c = document.createElement('canvas'); c.width=512; c.height=160;
+  const g = c.getContext('2d');
+  g.fillStyle = bg; g.fillRect(0,0,512,160);
+  g.strokeStyle = '#e8c15a'; g.lineWidth = 14; g.strokeRect(9,9,494,142);
+  g.strokeStyle = '#ffe9a8'; g.lineWidth = 3; g.strokeRect(24,24,464,112);
+  g.fillStyle = '#ffe9a8';
+  g.font = 'bold 58px Georgia, "Times New Roman", serif';
+  g.textAlign='center'; g.textBaseline='middle';
+  g.shadowColor='rgba(0,0,0,.55)'; g.shadowBlur=8; g.shadowOffsetY=3;
+  g.fillText(text, 256, 84);
+  const t = new THREE.CanvasTexture(c);
+  t.anisotropy = 4; t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+function dotTexture(){
+  const c = document.createElement('canvas'); c.width=c.height=64;
+  const g = c.getContext('2d');
+  const grd = g.createRadialGradient(32,32,0,32,32,32);
+  grd.addColorStop(0,'rgba(255,255,255,1)');
+  grd.addColorStop(0.35,'rgba(255,255,255,.75)');
+  grd.addColorStop(1,'rgba(255,255,255,0)');
+  g.fillStyle = grd; g.fillRect(0,0,64,64);
+  return new THREE.CanvasTexture(c);
+}
+
+/* =====================================================================
+   Scene setup
+   ===================================================================== */
+const app = document.getElementById('app');
+const renderer = new THREE.WebGLRenderer({ antialias:true, powerPreference:'high-performance' });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.15;
+app.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x070c1c);
+scene.fog = new THREE.Fog(0x0b1430, 200, 640);
+
+const camera = new THREE.PerspectiveCamera(58, window.innerWidth/window.innerHeight, 0.5, 2200);
+
+/* ---- lights ---- */
+scene.add(new THREE.HemisphereLight(0xa8c8ff, 0x35405e, 1.15));
+const moonLight = new THREE.DirectionalLight(0xd8e6ff, 1.5);
+moonLight.position.set(-60, 90, 40);
+moonLight.castShadow = true;
+moonLight.shadow.mapSize.set(1024,1024);
+moonLight.shadow.camera.left = -34; moonLight.shadow.camera.right = 34;
+moonLight.shadow.camera.top = 34;   moonLight.shadow.camera.bottom = -34;
+moonLight.shadow.camera.near = 1;   moonLight.shadow.camera.far = 260;
+moonLight.shadow.bias = -0.0016;
+scene.add(moonLight);
+scene.add(moonLight.target);
+
+const warmFill = new THREE.PointLight(0xffb050, 1.5, 34, 2);
+scene.add(warmFill);
+
+/* ---- sky dressing: stars + moon, parented to a group that rides with us ---- */
+const skyGroup = new THREE.Group();
+scene.add(skyGroup);
+{
+  const N = 1400, pos = new Float32Array(N*3), col = new Float32Array(N*3);
+  const c = new THREE.Color();
+  for(let i=0;i<N;i++){
+    const th = Math.random()*Math.PI*2, ph = Math.acos(rand(0.02,0.98));
+    const r = 1000;
+    pos[i*3]   = Math.sin(ph)*Math.cos(th)*r;
+    pos[i*3+1] = Math.cos(ph)*r*0.75 + 60;
+    pos[i*3+2] = Math.sin(ph)*Math.sin(th)*r;
+    c.setHSL(rand(0.55,0.68), rand(0,0.35), rand(0.55,1));
+    col[i*3]=c.r; col[i*3+1]=c.g; col[i*3+2]=c.b;
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(pos,3));
+  g.setAttribute('color', new THREE.BufferAttribute(col,3));
+  skyGroup.add(new THREE.Points(g, new THREE.PointsMaterial({
+    size:5.5, sizeAttenuation:true, map:dotTexture(), transparent:true,
+    depthWrite:false, vertexColors:true, fog:false, blending:THREE.AdditiveBlending })));
+
+  const moon = new THREE.Mesh(new THREE.SphereGeometry(46, 24, 18),
+    new THREE.MeshBasicMaterial({ color:0xfff6dd, fog:false }));
+  moon.position.set(-420, 320, 620);
+  skyGroup.add(moon);
+  const halo = new THREE.Sprite(new THREE.SpriteMaterial({
+    map:dotTexture(), color:0xbcd6ff, transparent:true, opacity:0.5,
+    depthWrite:false, blending:THREE.AdditiveBlending, fog:false }));
+  halo.scale.set(300,300,1); halo.position.copy(moon.position);
+  skyGroup.add(halo);
+}
+
+/* ---- ground ---- */
+const ground = new THREE.Mesh(
+  new THREE.PlaneGeometry(2200, 2200, 1, 1),
+  new THREE.MeshStandardMaterial({ color:0xdfeaff, roughness:0.95, metalness:0.0 })
+);
+ground.rotation.x = -Math.PI/2;
+ground.position.y = -0.02;
+ground.receiveShadow = true;
+scene.add(ground);
+
+/* ---- snowfall ---- */
+const SNOW_N = 2200, SNOW_BOX = 160;
+const snowPos = new Float32Array(SNOW_N*3);
+const snowVel = new Float32Array(SNOW_N*2);
+for(let i=0;i<SNOW_N;i++){
+  snowPos[i*3]   = rand(-SNOW_BOX, SNOW_BOX);
+  snowPos[i*3+1] = rand(0, 90);
+  snowPos[i*3+2] = rand(-SNOW_BOX, SNOW_BOX);
+  snowVel[i*2]   = rand(2,7);
+  snowVel[i*2+1] = rand(-2,2);
+}
+const snowGeo = new THREE.BufferGeometry();
+snowGeo.setAttribute('position', new THREE.BufferAttribute(snowPos,3));
+const snow = new THREE.Points(snowGeo, new THREE.PointsMaterial({
+  size:0.65, map:dotTexture(), transparent:true, opacity:0.9,
+  depthWrite:false, color:0xffffff, fog:false }));
+scene.add(snow);
+
+/* =====================================================================
+   Track path
+   ===================================================================== */
+function pathX(t){ return Math.sin(t*0.0042)*22 + Math.sin(t*0.0111+1.3)*8; }
+
+/* =====================================================================
+   Track segments
+   ===================================================================== */
+const trackGroup = new THREE.Group(); scene.add(trackGroup);
+const trackMat = new THREE.MeshStandardMaterial({ vertexColors:true, roughness:0.72, metalness:0.22, flatShading:true });
+
+const COL = { rail:0xb9c3cf, sleeper:0x4a3628, ballast:0x6f7078 };
+const SPLIT_U = 0.12;
+
+const track = {
+  segs: [],
+  tEnd: 0,
+  phase: 'single',
+  lanes: [0]
+};
+
+function laneOffsetAt(seg, i, u){
+  const l = seg.lanes[i];
+  return lerp(l.a, l.b, smooth(clamp(u,0,1)));
+}
+
+function buildSegmentMesh(seg){
+  const parts = [];
+  const len = seg.t1 - seg.t0;
+  const steps = Math.max(6, Math.round(len/2.6));
+  const nLanes = seg.lanes.length;
+
+  const addTrack = (li, uA, uB) => {
+    const lane = seg.lanes[li];
+    const oA = lerp(lane.a, lane.b, smooth(clamp(uA,0,1)));
+    const oB = lerp(lane.a, lane.b, smooth(clamp(uB,0,1)));
+    const zA = seg.t0 + len*uA, zB = seg.t0 + len*uB;
+    const cxA = pathX(zA) + oA, cxB = pathX(zB) + oB;
+    const half = CFG.gauge*0.5;
+    // rails
+    parts.push({ geo:UNIT_BOX, color:COL.rail, matrix:spanMatrix(cxA-half,zA,cxB-half,zB,0.17,0.19,0.46) });
+    parts.push({ geo:UNIT_BOX, color:COL.rail, matrix:spanMatrix(cxA+half,zA,cxB+half,zB,0.17,0.19,0.46) });
+    // sleeper every other step
+    if(li % 1 === 0 && Math.round(uA*steps) % 2 === 0){
+      parts.push({ geo:UNIT_BOX, color:COL.sleeper,
+        matrix:spanMatrix(cxA,zA, cxA + (cxB-cxA)*0.24, zA + (zB-zA)*0.24, 3.0, 0.17, 0.30) });
+    }
+  };
+
+  const addBallast = (li, uA, uB) => {
+    const lane = seg.lanes[li];
+    const oA = lerp(lane.a, lane.b, smooth(clamp(uA,0,1)));
+    const oB = lerp(lane.a, lane.b, smooth(clamp(uB,0,1)));
+    const zA = seg.t0 + len*uA, zB = seg.t0 + len*uB;
+    parts.push({ geo:UNIT_BOX, color:COL.ballast,
+      matrix:spanMatrix(pathX(zA)+oA, zA, pathX(zB)+oB, zB, 3.7, 0.30, 0.11 + li*0.007) });
+  };
+
+  for(let li=0; li<nLanes; li++){
+    let uMin = 0, uMax = 1;
+    if(seg.kind === 'split') uMin = SPLIT_U;
+    if(seg.kind === 'merge') uMax = 1 - SPLIT_U;
+    for(let s=0;s<steps;s++){
+      const uA = s/steps, uB = (s+1)/steps;
+      addBallast(li, uA, uB);
+      if(uB > uMin && uA < uMax) addTrack(li, Math.max(uA,uMin), Math.min(uB,uMax));
+    }
+  }
+
+  // the shared stub of rail leading into / out of a junction
+  if(seg.kind === 'split' || seg.kind === 'merge'){
+    const stub = { a: seg.stubOffset, b: seg.stubOffset };
+    const fake = { lanes:[stub], t0:seg.t0, t1:seg.t1 };
+    const uFrom = seg.kind==='split' ? 0 : 1-SPLIT_U-0.02;
+    const uTo   = seg.kind==='split' ? SPLIT_U+0.02 : 1;
+    const n = 6;
+    for(let s=0;s<n;s++){
+      const uA = lerp(uFrom,uTo,s/n), uB = lerp(uFrom,uTo,(s+1)/n);
+      const zA = seg.t0 + len*uA, zB = seg.t0 + len*uB;
+      const cxA = pathX(zA)+stub.a, cxB = pathX(zB)+stub.b;
+      const half = CFG.gauge*0.5;
+      parts.push({ geo:UNIT_BOX, color:COL.rail, matrix:spanMatrix(cxA-half,zA,cxB-half,zB,0.17,0.19,0.46) });
+      parts.push({ geo:UNIT_BOX, color:COL.rail, matrix:spanMatrix(cxA+half,zA,cxB+half,zB,0.17,0.19,0.46) });
+      parts.push({ geo:UNIT_BOX, color:COL.sleeper, matrix:spanMatrix(cxA,zA,cxA,zA+0.9,3.0,0.17,0.30) });
+    }
+  }
+
+  const geo = mergeParts(parts);
+  const mesh = new THREE.Mesh(geo, trackMat);
+  mesh.receiveShadow = true;
+  mesh.matrixAutoUpdate = false;
+  return mesh;
+}
+
+function addSegment(){
+  const t0 = track.tEnd;
+  let kind, len, lanes, stubOffset = 0;
+
+  switch(track.phase){
+    case 'single':
+      kind='run';
+      len = track.first ? 190 : rand(42,72);   // a calm straight to open on
+      track.first = false;
+      lanes = [{a:0,b:0}];
+      track.phase = 'split';
+      break;
+    case 'split': {
+      kind='split'; len = CFG.splitLen;
+      const n = Math.random() < 0.45 ? 3 : 2;
+      const set = CFG.laneSets[n];
+      lanes = set.map(o=>({a:0,b:o}));
+      stubOffset = 0;
+      track.phase = 'multi';
+      break;
+    }
+    case 'multi':
+      kind='run'; len = rand(78,120);
+      lanes = track.lanes.map(o=>({a:o,b:o}));
+      track.phase = 'merge';
+      break;
+    case 'merge':
+      kind='merge'; len = CFG.splitLen;
+      lanes = track.lanes.map(o=>({a:o,b:0}));
+      stubOffset = 0;
+      track.phase = 'single';
+      break;
+  }
+
+  const seg = { kind, t0, t1:t0+len, lanes, stubOffset, presents:[] };
+  seg.mesh = buildSegmentMesh(seg);
+  trackGroup.add(seg.mesh);
+  track.segs.push(seg);
+  track.tEnd = seg.t1;
+  track.lanes = lanes.map(l=>l.b);
+
+  scatterPresents(seg);
+  scatterHazards(seg);
+  scatterScenery(seg);
+  return seg;
+}
+
+function disposeSegment(seg){
+  trackGroup.remove(seg.mesh);
+  seg.mesh.geometry.dispose();
+}
+
+/* =====================================================================
+   Presents
+   ===================================================================== */
+const PRESENT_COLORS = [
+  { box:0xd6202c, ribbon:0xf2e3a8 },
+  { box:0x1f9e52, ribbon:0xf2e3a8 },
+  { box:0x2f6fd0, ribbon:0xffffff },
+  { box:0xe8b028, ribbon:0xc9202b },
+  { box:0xa246c9, ribbon:0xffe9a8 },
+  { box:0xf25f9e, ribbon:0xffffff },
+  { box:0xffffff, ribbon:0xc9202b }
+];
+const presentGeos = PRESENT_COLORS.map(c=>{
+  const parts = [];
+  parts.push({ geo:UNIT_BOX, color:c.box, matrix:boxMatrix(0,0,0, 1.0,0.92,1.0) });
+  parts.push({ geo:UNIT_BOX, color:c.ribbon, matrix:boxMatrix(0,0,0, 0.22,0.95,1.03) });
+  parts.push({ geo:UNIT_BOX, color:c.ribbon, matrix:boxMatrix(0,0,0, 1.03,0.95,0.22) });
+  const bow = new THREE.TorusGeometry(0.2,0.075,6,12);
+  parts.push({ geo:bow, color:c.ribbon, matrix:boxMatrix(-0.2,0.52,0, 1,1,1, Math.PI/2, 0, 0.35) });
+  parts.push({ geo:bow, color:c.ribbon, matrix:boxMatrix( 0.2,0.52,0, 1,1,1, Math.PI/2, 0,-0.35) });
+  bow.dispose();
+  return mergeParts(parts);
+});
+const presentMat = new THREE.MeshStandardMaterial({ vertexColors:true, roughness:0.5, metalness:0.12, flatShading:false });
+
+const beaconGeo = new THREE.CylinderGeometry(0.16, 0.42, 7.5, 8, 1, true);
+const beaconMats = PRESENT_COLORS.map(c=> new THREE.MeshBasicMaterial({
+  color:c.box, transparent:true, opacity:0.20, side:THREE.DoubleSide,
+  depthWrite:false, blending:THREE.AdditiveBlending, fog:true }));
+const sparkGeo = new THREE.SphereGeometry(0.34, 8, 6);
+
+const presents = [];
+function spawnPresent(t, offset, colorIdx){
+  const ci = colorIdx===undefined ? randi(0,PRESENT_COLORS.length-1) : colorIdx;
+  const g = new THREE.Group();
+  const m = new THREE.Mesh(presentGeos[ci], presentMat);
+  m.castShadow = true;
+  g.add(m);
+  const beam = new THREE.Mesh(beaconGeo, beaconMats[ci].clone());
+  beam.position.y = 4.2; beam.renderOrder = 2;
+  g.add(beam);
+  const spark = new THREE.Mesh(sparkGeo, new THREE.MeshBasicMaterial({
+    color:0xffffff, transparent:true, opacity:0.85, blending:THREE.AdditiveBlending, depthWrite:false }));
+  spark.position.y = 1.4; g.add(spark);
+
+  g.position.set(pathX(t)+offset, 0.95, t);
+  scene.add(g);
+  const p = { group:g, box:m, beam, spark, t, offset, ci, phase:rand(0,6.28), taken:false };
+  presents.push(p);
+  return p;
+}
+
+function scatterPresents(seg){
+  const len = seg.t1 - seg.t0;
+  if(seg.kind === 'run'){
+    const multi = seg.lanes.length > 1;
+    // give each branch a different richness so the choice matters
+    const weights = seg.lanes.map(()=> rand(0.1,0.75));
+    if(multi) weights[randi(0,weights.length-1)] = 1.0;   // one branch is always the rich one
+    seg.lanes.forEach((lane, li)=>{
+      const gap = multi ? lerp(26, 6.5, weights[li]) : 11;
+      for(let t = seg.t0 + 8; t < seg.t1 - 6; t += gap*rand(0.85,1.15)){
+        if(Math.random() > (multi ? 0.9 : 0.72)) continue;
+        spawnPresent(t, lane.a);
+      }
+    });
+  } else if(seg.kind === 'split'){
+    seg.lanes.forEach((lane, li)=>{
+      for(let k=0;k<2;k++){
+        const u = rand(0.62, 0.95);
+        if(Math.random() < 0.55)
+          spawnPresent(seg.t0 + len*u, lerp(lane.a, lane.b, smooth(u)));
+      }
+    });
+  } else if(seg.kind === 'merge'){
+    seg.lanes.forEach(lane=>{
+      if(Math.random() < 0.5){
+        const u = rand(0.05, 0.3);
+        spawnPresent(seg.t0 + len*u, lerp(lane.a, lane.b, smooth(u)));
+      }
+    });
+  }
+}
+
+/* =====================================================================
+   Boulders — one sits on a single branch of every junction
+   ===================================================================== */
+const boulderGeos = [];
+for(let v=0; v<3; v++){
+  // knock an icosahedron out of shape so it reads as a rough rock
+  const rock = new THREE.IcosahedronGeometry(1.7, 1);
+  const pa = rock.attributes.position;
+  for(let i=0;i<pa.count;i++){
+    const s = 0.74 + Math.random()*0.5;
+    pa.setXYZ(i, pa.getX(i)*s, pa.getY(i)*s*0.82, pa.getZ(i)*s);
+  }
+  rock.computeVertexNormals();
+  const parts = [
+    { geo:rock, color:0x6d7079, matrix:boxMatrix(0, 1.45, 0, 1,1,1, 0, rand(0,6.28), 0) },
+    { geo:rock, color:0x585c66, matrix:boxMatrix(rand(-1,1), 0.6, rand(-1,1), 0.55,0.5,0.55, 0.4, rand(0,6.28), 0.2) },
+    { geo:rock, color:0x7b7f89, matrix:boxMatrix(rand(-1.4,1.4), 0.45, rand(-1.4,1.4), 0.4,0.36,0.4, 0, rand(0,6.28), 0.5) }
+  ];
+  // a cap of snow on top
+  const cap = new THREE.SphereGeometry(1.15, 10, 6, 0, Math.PI*2, 0, Math.PI*0.42);
+  parts.push({ geo:cap, color:0xeef5ff, matrix:boxMatrix(0, 1.92, 0, 1,0.75,1) });
+  cap.dispose(); rock.dispose();
+  boulderGeos.push(mergeParts(parts));
+}
+const boulderMat = new THREE.MeshStandardMaterial({ vertexColors:true, roughness:0.94, metalness:0.04, flatShading:true });
+const warnBeamGeo = new THREE.CylinderGeometry(0.7, 2.1, 15, 10, 1, true);
+const warnBeamMat = new THREE.MeshBasicMaterial({ color:0xff2417, transparent:true, opacity:0.2,
+  side:THREE.DoubleSide, depthWrite:false, blending:THREE.AdditiveBlending });
+const warnSignGeo = new THREE.OctahedronGeometry(0.75, 0);
+
+const hazards = [];
+function spawnBoulder(t, offset){
+  const g = new THREE.Group();
+  const rock = new THREE.Mesh(pick(boulderGeos), boulderMat);
+  rock.castShadow = true; rock.receiveShadow = true;
+  rock.rotation.y = rand(0, 6.28);
+  g.add(rock);
+
+  const beam = new THREE.Mesh(warnBeamGeo, warnBeamMat.clone());
+  beam.position.y = 8.0; beam.renderOrder = 3;
+  g.add(beam);
+
+  const sign = new THREE.Mesh(warnSignGeo, new THREE.MeshBasicMaterial({ color:0xff5140 }));
+  sign.position.y = 4.6;
+  g.add(sign);
+
+  g.position.set(pathX(t) + offset, 0, t);
+  scene.add(g);
+  const h = { group:g, beam, sign, t, x:g.position.x, phase:rand(0,6.28) };
+  hazards.push(h);
+  // don't dangle a present right where the rock is — that's just mean
+  for(let i=presents.length-1;i>=0;i--){
+    const p = presents[i];
+    if(Math.abs(p.t - t) < 8 && Math.abs(p.group.position.x - h.x) < 4){
+      scene.remove(p.group); p.spark.material.dispose(); p.beam.material.dispose();
+      presents.splice(i,1);
+    }
+  }
+  return h;
+}
+function clearHazards(){
+  for(const h of hazards){ scene.remove(h.group); h.beam.material.dispose(); h.sign.material.dispose(); }
+  hazards.length = 0;
+}
+
+/* one boulder per junction, always leaving at least one clear branch */
+function scatterHazards(seg){
+  if(seg.kind !== 'split') return;
+  if(seg.t0 < 150) return;                       // the opening junction is a freebie
+  const n = seg.lanes.length;
+  const len = seg.t1 - seg.t0;
+
+  // three-way junctions can get a second rock further in — but never all of them,
+  // so there is always exactly one clear road through
+  let count = 1;
+  if(n === 3 && Math.random() < clamp((seg.t0 - 900)/6000, 0, 0.5)) count = 2;
+
+  const choices = [];
+  while(choices.length < count){
+    const li = randi(0, n-1);
+    if(!choices.includes(li)) choices.push(li);
+  }
+
+  for(const li of choices){
+    const lane = seg.lanes[li];
+    const u = rand(0.72, 0.9);
+    const h = spawnBoulder(seg.t0 + len*u, lerp(lane.a, lane.b, smooth(u)));
+    h.laneIdx = li;
+    h.seg = seg;
+  }
+}
+
+/* =====================================================================
+   Scenery — trees, candy canes, snow drifts
+   ===================================================================== */
+const sceneryGroup = new THREE.Group(); scene.add(sceneryGroup);
+const sceneryMat = new THREE.MeshStandardMaterial({ vertexColors:true, roughness:0.85, metalness:0.0, flatShading:true });
+
+const treeGeos = [];
+for(let v=0; v<3; v++){
+  const parts = [];
+  const h = rand(7,12), r = rand(2.0,3.0);
+  const trunk = new THREE.CylinderGeometry(0.35,0.45,2.2,6);
+  parts.push({ geo:trunk, color:0x4a3324, matrix:boxMatrix(0,1.1,0,1,1,1) });
+  const tiers = 3 + (v%2);
+  for(let i=0;i<tiers;i++){
+    const f = i/tiers;
+    const y = 2.0 + f*h*0.78;
+    const cone = new THREE.ConeGeometry(r*(1-f*0.6), h/tiers*1.55, 8);
+    parts.push({ geo:cone, color: i===tiers-1 ? 0x1e7a45 : 0x1a6b3e, matrix:boxMatrix(0, y, 0, 1,1,1) });
+    const snowCone = new THREE.ConeGeometry(r*(1-f*0.6)*0.78, h/tiers*0.62, 8);
+    parts.push({ geo:snowCone, color:0xeef5ff, matrix:boxMatrix(0, y + h/tiers*0.52, 0, 1,1,1) });
+    cone.dispose(); snowCone.dispose();
+  }
+  trunk.dispose();
+  treeGeos.push(mergeParts(parts));
+}
+
+const caneGeo = (()=>{
+  const parts=[];
+  for(let i=0;i<9;i++)
+    parts.push({ geo:UNIT_BOX, color: i%2 ? 0xd6202c : 0xffffff, matrix:boxMatrix(0, 0.35+i*0.62, 0, 0.42,0.62,0.42) });
+  parts.push({ geo:new THREE.SphereGeometry(0.5,8,6), color:0xe8c15a, matrix:boxMatrix(0, 6.1, 0, 1,1,1) });
+  return mergeParts(parts);
+})();
+
+/* ---- distant snow-capped hills (big, sit on the horizon) ---- */
+const hillGeos = [];
+for(let v=0; v<3; v++){
+  const r = rand(46, 92);
+  const dome = new THREE.SphereGeometry(r, 18, 10, 0, Math.PI*2, 0, Math.PI*0.5);
+  const pa = dome.attributes.position;
+  for(let i=0;i<pa.count;i++){                     // lumpy, not a perfect dome
+    const yy = pa.getY(i);
+    const k = 0.82 + Math.sin(pa.getX(i)*0.06 + v)*0.12 + Math.random()*0.06;
+    pa.setXYZ(i, pa.getX(i)*k, yy*rand(0.34,0.5), pa.getZ(i)*k);
+  }
+  dome.computeVertexNormals();
+  hillGeos.push(mergeParts([{ geo:dome, color: v%2 ? 0xcdd9ee : 0xd8e4f5, matrix:boxMatrix(0,0,0,1,1,1) }]));
+  dome.dispose();
+}
+const hillMat = new THREE.MeshStandardMaterial({ vertexColors:true, roughness:1, metalness:0, flatShading:true });
+
+/* ---- decorative rocks (off-track, non-colliding — reuse the boulder shapes) ---- */
+const rockDecorMat = new THREE.MeshStandardMaterial({ vertexColors:true, roughness:0.95, metalness:0.04, flatShading:true });
+
+/* ---- buildings: houses for towns, towers for cities ---- */
+const winMat = new THREE.MeshBasicMaterial({ vertexColors:true, fog:true });   // unlit → windows glow at night
+
+function makeHouse(){
+  const wall = pick([0x6b5844, 0x7a5a48, 0x5f6b78, 0x8a6b52, 0x6d5a6a]);
+  const roofC = pick([0x8a1119, 0x1a6b3e, 0x3a4656, 0x7d3410]);
+  const w = rand(5,7.5), d = rand(5,7.5), h = rand(3.5,5.2);
+  const body=[], win=[];
+  body.push({ geo:UNIT_BOX, color:wall, matrix:boxMatrix(0,h/2,0,w,h,d) });
+  const roof = new THREE.ConeGeometry(Math.max(w,d)*0.74, h*0.8, 4);
+  body.push({ geo:roof, color:roofC, matrix:boxMatrix(0,h+h*0.4,0,1,1,1,0,Math.PI/4,0) });
+  const snow = new THREE.ConeGeometry(Math.max(w,d)*0.68, h*0.32, 4);
+  body.push({ geo:snow, color:0xeef5ff, matrix:boxMatrix(0,h+h*0.62,0,1,1,1,0,Math.PI/4,0) });
+  roof.dispose(); snow.dispose();
+  body.push({ geo:UNIT_BOX, color:0x3a2a22, matrix:boxMatrix(w*0.26,h+h*0.42,0,0.5,1.3,0.5) });
+  for(const wx of [-w*0.28, w*0.28]) win.push({ geo:UNIT_BOX, color:0xffd98a, matrix:boxMatrix(wx,h*0.52,d/2+0.03,1.0,0.95,0.08) });
+  win.push({ geo:UNIT_BOX, color:0xffb45a, matrix:boxMatrix(0,h*0.33,d/2+0.03,0.95,1.35,0.08) });
+  return { body:mergeParts(body), win:mergeParts(win), h };
+}
+
+function makeTower(){
+  const wall = pick([0x2a3340, 0x34303e, 0x2f3a3a, 0x3a2f34, 0x283042]);
+  const w = rand(6,10), d = rand(6,10), h = rand(14,44);
+  const body=[], win=[];
+  body.push({ geo:UNIT_BOX, color:wall, matrix:boxMatrix(0,h/2,0,w,h,d) });
+  body.push({ geo:UNIT_BOX, color:0x1c222c, matrix:boxMatrix(0,h+0.4,0,w*0.92,0.8,d*0.92) });
+  body.push({ geo:UNIT_BOX, color:0xeef5ff, matrix:boxMatrix(0,h+0.95,0,w*0.6,0.3,d*0.6) });
+  const cols = Math.max(2, Math.floor(w/2)), rows = Math.floor(h/3);
+  for(let r=0;r<rows;r++) for(let c=0;c<cols;c++){
+    if(Math.random() < 0.34) continue;
+    const col = Math.random() < 0.16 ? 0xbfe6ff : 0xffd98a;
+    win.push({ geo:UNIT_BOX, color:col, matrix:boxMatrix(-w/2+(c+0.5)*(w/cols), 2+r*3, d/2+0.03, (w/cols)*0.55, 1.4, 0.06) });
+  }
+  const colsD = Math.max(2, Math.floor(d/2));
+  for(let r=0;r<rows;r++) for(let c=0;c<colsD;c++){
+    if(Math.random() < 0.42) continue;
+    win.push({ geo:UNIT_BOX, color:0xffd98a, matrix:boxMatrix(w/2+0.03, 2+r*3, -d/2+(c+0.5)*(d/colsD), 0.06, 1.4, (d/colsD)*0.55) });
+  }
+  return { body:mergeParts(body), win:mergeParts(win), h };
+}
+
+const houseVariants = []; for(let i=0;i<7;i++) houseVariants.push(makeHouse());
+const towerVariants = []; for(let i=0;i<7;i++) towerVariants.push(makeTower());
+
+/* streetlamp for the settlements */
+const lampGeo = mergeParts([
+  { geo:UNIT_BOX, color:0x2b2b30, matrix:boxMatrix(0,2.2,0,0.28,4.4,0.28) },
+  { geo:UNIT_BOX, color:0x2b2b30, matrix:boxMatrix(0.5,4.3,0,1.2,0.24,0.24) }
+]);
+const lampGlowGeo = mergeParts([{ geo:new THREE.SphereGeometry(0.42,8,6), color:0xffe6a0, matrix:boxMatrix(1.0,4.1,0,1,1,1) }]);
+
+/* Which kind of place are we passing through at distance t?
+   Every ~2.2 km cycle has a ~600 m settlement window; a hash decides town vs city. */
+function districtAt(t){
+  const cycle = 2200, i = Math.floor(t / cycle), phase = t - i*cycle;
+  if(phase > 640 && phase < 1240){
+    const hh = Math.sin(i*127.13) * 43758.545;
+    return (hh - Math.floor(hh)) < 0.5 ? 'town' : 'city';
+  }
+  return 'wild';
+}
+
+function addProp(seg, geo, mat, x, t, s, ry, castShadow){
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.position.set(x, 0, t);
+  mesh.rotation.y = ry;
+  mesh.scale.setScalar(s);
+  if(castShadow) mesh.castShadow = true;
+  mesh.matrixAutoUpdate = false; mesh.updateMatrix();
+  sceneryGroup.add(mesh);
+  seg.props.push(mesh);
+  return mesh;
+}
+
+function placeBuilding(seg, side, off, t, kind){
+  // front (+z local) should face the track: on the +x side rotate to face -x, etc.
+  const face = side > 0 ? -Math.PI/2 : Math.PI/2;
+  const ry = face + rand(-0.12, 0.12);
+  const x = pathX(t) + side*off;
+  const v = kind === 'city' ? pick(towerVariants) : pick(houseVariants);
+  const s = kind === 'city' ? rand(0.9, 1.5) : rand(0.9, 1.25);
+  addProp(seg, v.body, sceneryMat, x, t, s, ry, true);
+  addProp(seg, v.win,  winMat,     x, t, s, ry, false);
+}
+
+function scatterScenery(seg){
+  seg.props = [];
+  const len = seg.t1 - seg.t0;
+  const spread = Math.max(...seg.lanes.map(l=>Math.max(Math.abs(l.a),Math.abs(l.b)))) + 14;
+
+  // walk the segment in ~6 m steps, deciding scenery per position and per side
+  const step = 6;
+  for(let t = seg.t0; t < seg.t1; t += step){
+    const district = districtAt(t);
+    for(const side of [-1, 1]){
+      if(district === 'wild'){
+        // dense trees, the odd candy cane
+        if(Math.random() < 0.62){
+          const off = rand(spread, spread + 85);
+          const isCane = Math.random() < 0.06 && off < spread + 16;
+          addProp(seg, isCane ? caneGeo : pick(treeGeos), sceneryMat,
+                  pathX(t) + side*off, t, isCane ? 1 : rand(0.7,1.6), rand(0,6.28), false);
+        }
+        // occasional off-track rock
+        if(Math.random() < 0.05)
+          addProp(seg, pick(boulderGeos), rockDecorMat,
+                  pathX(t) + side*rand(spread+6, spread+70), t, rand(1,2.6), rand(0,6.28), true);
+      } else if(district === 'town'){
+        // houses close in, a lamp now and then, trees behind
+        if(Math.random() < 0.5){
+          const off = spread + rand(3, 16);
+          placeBuilding(seg, side, off, t, 'town');
+          if(Math.random() < 0.3){
+            addProp(seg, lampGeo, sceneryMat, pathX(t)+side*(spread+1.5), t+3, 1, side>0?-Math.PI/2:Math.PI/2, false);
+            addProp(seg, lampGlowGeo, winMat, pathX(t)+side*(spread+1.5), t+3, 1, side>0?-Math.PI/2:Math.PI/2, false);
+          }
+        }
+        if(Math.random() < 0.28)
+          addProp(seg, pick(treeGeos), sceneryMat, pathX(t)+side*rand(spread+22, spread+80), t, rand(0.8,1.4), rand(0,6.28), false);
+      } else { // city
+        // a near row of towers plus a taller back row
+        if(Math.random() < 0.6){
+          placeBuilding(seg, side, spread + rand(4, 20), t, 'city');
+        }
+        if(Math.random() < 0.4){
+          placeBuilding(seg, side, spread + rand(30, 62), t + rand(-3,3), 'city');
+        }
+        if(Math.random() < 0.22){
+          addProp(seg, lampGeo, sceneryMat, pathX(t)+side*(spread+1.5), t+3, 1, side>0?-Math.PI/2:Math.PI/2, false);
+          addProp(seg, lampGlowGeo, winMat, pathX(t)+side*(spread+1.5), t+3, 1, side>0?-Math.PI/2:Math.PI/2, false);
+        }
+      }
+    }
+
+    // distant hills on the horizon, sparse, both districts (far behind everything)
+    if(Math.random() < 0.045){
+      const side = Math.random() < 0.5 ? -1 : 1;
+      addProp(seg, pick(hillGeos), hillMat,
+              pathX(t) + side*rand(spread+150, spread+340), t, rand(0.8,1.8), rand(0,6.28), false);
+    }
+  }
+}
+
+/* =====================================================================
+   The train
+   ===================================================================== */
+const MATS = {
+  red:    new THREE.MeshStandardMaterial({ color:0xc9202b, roughness:0.42, metalness:0.18 }),
+  darkRed:new THREE.MeshStandardMaterial({ color:0x8a1119, roughness:0.5,  metalness:0.15 }),
+  green:  new THREE.MeshStandardMaterial({ color:0x1a7a45, roughness:0.45, metalness:0.15 }),
+  gold:   new THREE.MeshStandardMaterial({ color:0xd8a93a, roughness:0.24, metalness:0.95 }),
+  silver: new THREE.MeshStandardMaterial({ color:0xd3dae2, roughness:0.16, metalness:0.98 }),
+  black:  new THREE.MeshStandardMaterial({ color:0x1d1f26, roughness:0.6,  metalness:0.35 }),
+  glass:  new THREE.MeshStandardMaterial({ color:0xffce7a, roughness:0.3, metalness:0.1, emissive:0xff9b3d, emissiveIntensity:0.9 }),
+  white:  new THREE.MeshStandardMaterial({ color:0xf2f6ff, roughness:0.7,  metalness:0.05 }),
+  lamp:   new THREE.MeshBasicMaterial({ color:0xfff3c4 })
+};
+const lightsMat = new THREE.MeshBasicMaterial({ vertexColors:true });
+
+function addBox(parent, mat, x,y,z, w,h,d, rx=0,ry=0,rz=0){
+  const m = new THREE.Mesh(UNIT_BOX, mat);
+  m.position.set(x,y,z); m.rotation.set(rx,ry,rz); m.scale.set(w,h,d);
+  m.castShadow = true;
+  parent.add(m); return m;
+}
+function addMesh(parent, geo, mat, x,y,z, rx=0,ry=0,rz=0, s=1){
+  const m = new THREE.Mesh(geo, mat);
+  m.position.set(x,y,z); m.rotation.set(rx,ry,rz); m.scale.setScalar(s);
+  m.castShadow = true;
+  parent.add(m); return m;
+}
+
+/* a string of little coloured bulbs along a line */
+function fairyLights(parent, y, z0, z1, xs, count){
+  const parts = [];
+  const cols = [0xff3b3b, 0xffd33b, 0x4dff70, 0x4dc4ff, 0xff6bd6];
+  const sph = new THREE.SphereGeometry(0.11, 6, 5);
+  for(let i=0;i<count;i++){
+    const f = i/(count-1);
+    const z = lerp(z0,z1,f);
+    for(const x of xs)
+      parts.push({ geo:sph, color:cols[i%cols.length],
+                   matrix:boxMatrix(x, y + Math.sin(f*Math.PI*3)*0.06, z, 1,1,1) });
+  }
+  sph.dispose();
+  const m = new THREE.Mesh(mergeParts(parts), lightsMat);
+  parent.add(m);
+  return m;
+}
+
+function makeWheel(parent, x, z, r, hub=0xd8a93a){
+  const g = new THREE.Group();
+  g.userData.wheel = true;      // treated as one lump when the train comes apart
+  g.position.set(x, r, z);
+  const tyre = new THREE.Mesh(new THREE.CylinderGeometry(r, r, 0.26, 16), MATS.black);
+  tyre.rotation.z = Math.PI/2; tyre.castShadow = true;
+  g.add(tyre);
+  const rim = new THREE.Mesh(new THREE.CylinderGeometry(r*0.82, r*0.82, 0.3, 16),
+    new THREE.MeshStandardMaterial({ color:0xb01d26, roughness:0.4, metalness:0.2 }));
+  rim.rotation.z = Math.PI/2; g.add(rim);
+  const hubM = new THREE.Mesh(new THREE.CylinderGeometry(r*0.26, r*0.26, 0.34, 10),
+    new THREE.MeshStandardMaterial({ color:hub, roughness:0.25, metalness:0.9 }));
+  hubM.rotation.z = Math.PI/2; g.add(hubM);
+  for(let i=0;i<4;i++){
+    const spoke = new THREE.Mesh(UNIT_BOX, MATS.gold);
+    spoke.scale.set(0.11, r*1.55, 0.11);
+    spoke.rotation.set(i*Math.PI/4, 0, 0);   // spokes lie in the wheel's own plane
+    g.add(spoke);
+  }
+  parent.add(g);
+  return g;
+}
+
+const plaqueMatGreen = new THREE.MeshStandardMaterial({ map:plaqueTexture('MERRY CHRISTMAS','#0e6b3a'), roughness:0.6 });
+const plaqueMatRed   = new THREE.MeshStandardMaterial({ map:plaqueTexture('MERRY CHRISTMAS','#8a1119'), roughness:0.6 });
+const plaqueGeo = new THREE.PlaneGeometry(2.3, 0.72);
+
+function addPlaques(parent, y, z, halfW, mat){
+  const a = new THREE.Mesh(plaqueGeo, mat);
+  a.position.set(halfW+0.01, y, z); a.rotation.y = Math.PI/2; parent.add(a);
+  const b = new THREE.Mesh(plaqueGeo, mat);
+  b.position.set(-halfW-0.01, y, z); b.rotation.y = -Math.PI/2; parent.add(b);
+}
+
+/* ---------- locomotive ---------- */
+function buildLoco(){
+  const g = new THREE.Group();
+  const wheels = [];
+
+  // chassis
+  addBox(g, MATS.darkRed, 0, 1.30, 0, 2.7, 0.52, 8.0);
+  addBox(g, MATS.gold,    0, 1.06, 0, 2.86, 0.12, 7.6);
+
+  // boiler
+  const boiler = new THREE.Mesh(new THREE.CylinderGeometry(0.95,0.95,5.3,20), MATS.red);
+  boiler.rotation.x = Math.PI/2; boiler.position.set(0,2.52,1.05); boiler.castShadow = true;
+  g.add(boiler);
+  const band = new THREE.Mesh(new THREE.CylinderGeometry(0.985,0.985,1.35,20), MATS.silver);
+  band.rotation.x = Math.PI/2; band.position.set(0,2.52,1.5); g.add(band);
+  for(const z of [-0.2, 2.55]){
+    const ring = new THREE.Mesh(new THREE.CylinderGeometry(1.0,1.0,0.2,20), MATS.gold);
+    ring.rotation.x = Math.PI/2; ring.position.set(0,2.52,z); g.add(ring);
+  }
+
+  // smokebox + front
+  const sb = new THREE.Mesh(new THREE.CylinderGeometry(1.0,1.0,0.9,20), MATS.black);
+  sb.rotation.x = Math.PI/2; sb.position.set(0,2.52,4.02); sb.castShadow = true; g.add(sb);
+  const rim = new THREE.Mesh(new THREE.TorusGeometry(1.0,0.11,8,22), MATS.gold);
+  rim.position.set(0,2.52,4.46); g.add(rim);
+  const face = new THREE.Mesh(new THREE.CircleGeometry(0.98,20), MATS.darkRed);
+  face.position.set(0,2.52,4.47); g.add(face);
+  // wreath on the smokebox door
+  const wreath = new THREE.Mesh(new THREE.TorusGeometry(0.46,0.15,7,16),
+    new THREE.MeshStandardMaterial({ color:0x1a6b3e, roughness:0.8 }));
+  wreath.position.set(0,2.52,4.56); g.add(wreath);
+  const bowKnot = new THREE.Mesh(new THREE.SphereGeometry(0.15,7,6), MATS.red);
+  bowKnot.position.set(0,2.06,4.6); g.add(bowKnot);
+
+  // headlamp
+  const lampBody = new THREE.Mesh(new THREE.CylinderGeometry(0.4,0.44,0.62,12), MATS.gold);
+  lampBody.rotation.x = Math.PI/2; lampBody.position.set(0,3.75,3.95); g.add(lampBody);
+  const lampGlass = new THREE.Mesh(new THREE.CircleGeometry(0.34,12), MATS.lamp);
+  lampGlass.position.set(0,3.75,4.28); g.add(lampGlass);
+
+  // funnel
+  const fun = new THREE.Mesh(new THREE.CylinderGeometry(0.62,0.44,1.25,14), MATS.black);
+  fun.position.set(0,4.05,3.05); fun.castShadow = true; g.add(fun);
+  const funRim = new THREE.Mesh(new THREE.TorusGeometry(0.62,0.09,7,16), MATS.gold);
+  funRim.rotation.x = Math.PI/2; funRim.position.set(0,4.66,3.05); g.add(funRim);
+
+  // steam dome + whistle + bell
+  const dome = new THREE.Mesh(new THREE.SphereGeometry(0.5,14,10,0,Math.PI*2,0,Math.PI/2), MATS.gold);
+  dome.position.set(0,3.4,1.15); dome.scale.y = 0.85; g.add(dome);
+  const whistle = new THREE.Mesh(new THREE.CylinderGeometry(0.26,0.3,0.75,10), MATS.red);
+  whistle.position.set(0,3.7,0.05); g.add(whistle);
+  const whistleCap = new THREE.Mesh(new THREE.SphereGeometry(0.3,10,8), MATS.red);
+  whistleCap.position.set(0,4.1,0.05); g.add(whistleCap);
+  const bell = new THREE.Mesh(new THREE.CylinderGeometry(0.1,0.26,0.34,10), MATS.gold);
+  bell.position.set(0,3.45,2.35); g.add(bell);
+
+  // cab
+  addBox(g, MATS.red, 0, 2.78, -2.45, 2.76, 2.3, 2.9);
+  addBox(g, MATS.gold, 0, 1.68, -2.45, 2.84, 0.13, 2.98);
+  addBox(g, MATS.gold, 0, 3.9,  -2.45, 2.9, 0.14, 3.06);
+  // green roof (slightly domed via two slabs)
+  addBox(g, MATS.green, 0, 4.02, -2.45, 3.16, 0.2, 3.42);
+  addBox(g, MATS.green, 0, 4.16, -2.45, 2.7, 0.16, 3.1);
+  addBox(g, MATS.gold,  0, 4.12, -0.78, 3.2, 0.1, 0.12);
+  addBox(g, MATS.gold,  0, 4.12, -4.12, 3.2, 0.1, 0.12);
+  // windows
+  for(const s of [-1,1]) addBox(g, MATS.glass, s*1.4, 3.15, -1.75, 0.06, 0.92, 1.0);
+  addBox(g, MATS.glass, 0, 3.2, -3.93, 1.5, 0.9, 0.06);
+  // firebox glow slot
+  addBox(g, MATS.glass, 0, 2.1, -1.02, 1.0, 0.5, 0.06);
+  addPlaques(g, 2.25, -2.45, 1.39, plaqueMatGreen);
+
+  // running boards
+  for(const s of [-1,1]) addBox(g, MATS.gold, s*1.28, 1.62, 1.6, 0.34, 0.1, 5.0);
+
+  // cowcatcher
+  const pilot = new THREE.Group(); pilot.position.set(0,0,4.35); g.add(pilot);
+  for(let i=-2;i<=2;i++){
+    const b = addBox(pilot, MATS.red, i*0.42, 0.72, 0.28, 0.16, 1.5, 0.16, -0.42, 0, 0);
+    b.scale.set(0.16, 1.55, 0.16);
+  }
+  addBox(pilot, MATS.gold, 0, 1.34, -0.1, 2.5, 0.2, 0.5);
+  addBox(pilot, MATS.gold, 0, 0.16, 0.5, 2.2, 0.16, 0.4);
+  // buffer beam
+  addBox(g, MATS.gold, 0, 1.9, 4.5, 2.5, 0.42, 0.2);
+
+  // wheels
+  const driverZ = [-2.5, -0.55, 1.4];
+  for(const z of driverZ) for(const s of [-1,1]) wheels.push(makeWheel(g, s*1.42, z, 0.85));
+  for(const z of [3.2, 4.05]) for(const s of [-1,1]) wheels.push(makeWheel(g, s*1.4, z, 0.46, 0xd3dae2));
+
+  // side rods
+  const rods = [];
+  for(const s of [-1,1]){
+    const rod = addBox(g, MATS.gold, s*1.62, 0.85, -0.55, 0.13, 0.2, 4.5);
+    rods.push(rod);
+  }
+
+  fairyLights(g, 4.28, -4.0, -0.9, [-1.5, 1.5], 7);
+
+  g.userData = { wheels, rods, driverR:0.85 };
+  return g;
+}
+
+/* ---------- open wagon that fills with presents ---------- */
+function buildGondola(bodyColor, plaqueMat, trimGold=true){
+  const g = new THREE.Group();
+  const wheels = [];
+  const bodyMat = new THREE.MeshStandardMaterial({ color:bodyColor, roughness:0.44, metalness:0.16 });
+
+  addBox(g, MATS.black, 0, 1.05, 0, 2.4, 0.5, 6.3);            // underframe
+  addBox(g, bodyMat,    0, 1.45, 0, 3.0, 0.34, 6.3);            // floor
+  addBox(g, bodyMat,    0, 2.18, 3.05, 3.0, 1.42, 0.24);        // front wall
+  addBox(g, bodyMat,    0, 2.18,-3.05, 3.0, 1.42, 0.24);        // rear wall
+  for(const s of [-1,1]) addBox(g, bodyMat, s*1.44, 2.18, 0, 0.24, 1.42, 6.3);
+  if(trimGold){
+    for(const s of [-1,1]) addBox(g, MATS.gold, s*1.44, 2.94, 0, 0.34, 0.12, 6.42);
+    addBox(g, MATS.gold, 0, 2.94, 3.05, 3.1, 0.12, 0.34);
+    addBox(g, MATS.gold, 0, 2.94,-3.05, 3.1, 0.12, 0.34);
+    for(const s of [-1,1]) addBox(g, MATS.gold, s*1.46, 1.62, 0, 0.28, 0.1, 6.3);
+  }
+  addPlaques(g, 2.2, 0, 1.47, plaqueMat);
+
+  for(const z of [-2.05, 2.05]) for(const s of [-1,1]) wheels.push(makeWheel(g, s*1.34, z, 0.55, 0xd3dae2));
+  // couplers
+  addBox(g, MATS.black, 0, 1.15, 3.4, 0.3, 0.3, 0.8);
+  addBox(g, MATS.black, 0, 1.15,-3.4, 0.3, 0.3, 0.8);
+  fairyLights(g, 3.06, -3.0, 3.0, [-1.5, 1.5], 9);
+
+  g.userData = { wheels, cargo:true };
+  return g;
+}
+
+/* ---------- decorated box car (the caboose) ---------- */
+function buildBoxcar(){
+  const g = new THREE.Group();
+  const wheels = [];
+  addBox(g, MATS.black, 0, 1.05, 0, 2.4, 0.5, 6.4);
+  addBox(g, MATS.red,   0, 2.55, 0, 2.9, 2.3, 6.4);
+  addBox(g, MATS.gold,  0, 1.44, 0, 3.0, 0.14, 6.5);
+  addBox(g, MATS.gold,  0, 3.66, 0, 3.0, 0.14, 6.5);
+  // arched green roof
+  const roof = new THREE.Mesh(new THREE.CylinderGeometry(1.62,1.62,6.7,14,1,false,0,Math.PI),
+    new THREE.MeshStandardMaterial({ color:0x1a7a45, roughness:0.5, metalness:0.12 }));
+  roof.rotation.z = Math.PI/2; roof.rotation.y = Math.PI/2;
+  roof.position.set(0,3.62,0); roof.castShadow = true; g.add(roof);
+  // doors + windows
+  for(const s of [-1,1]){
+    addBox(g, MATS.darkRed, s*1.47, 2.5, 0, 0.08, 1.9, 2.1);
+    addBox(g, MATS.gold,    s*1.5,  2.5, 1.05, 0.06, 1.94, 0.1);
+    addBox(g, MATS.gold,    s*1.5,  2.5,-1.05, 0.06, 1.94, 0.1);
+    addBox(g, MATS.glass,   s*1.48, 3.05, 2.3, 0.06, 0.7, 0.9);
+    addBox(g, MATS.glass,   s*1.48, 3.05,-2.3, 0.06, 0.7, 0.9);
+  }
+  addPlaques(g, 2.5, 0, 1.52, plaqueMatGreen);
+  // rear wreath
+  const wreath = new THREE.Mesh(new THREE.TorusGeometry(0.66,0.2,8,18),
+    new THREE.MeshStandardMaterial({ color:0x1a6b3e, roughness:0.8 }));
+  wreath.position.set(0,2.6,-3.28); g.add(wreath);
+  const knot = new THREE.Mesh(new THREE.SphereGeometry(0.2,8,6), MATS.red);
+  knot.position.set(0,2.0,-3.35); g.add(knot);
+
+  for(const z of [-2.1, 2.1]) for(const s of [-1,1]) wheels.push(makeWheel(g, s*1.34, z, 0.55, 0xd3dae2));
+  addBox(g, MATS.black, 0, 1.15, 3.5, 0.3, 0.3, 0.8);
+  fairyLights(g, 4.34, -3.1, 3.1, [-0.9, 0.9], 11);
+  g.userData = { wheels };
+  return g;
+}
+
+/* ---------- assemble the consist ---------- */
+const trainGroup = new THREE.Group();
+scene.add(trainGroup);
+
+const loco = buildLoco();
+const carC = buildBoxcar();                          // closed van, rides behind the loco
+const carA = buildGondola(0x1a7a45, plaqueMatRed);   // green open wagon
+const carB = buildGondola(0xc9202b, plaqueMatGreen); // red open wagon
+// the two open wagons ride at the rear, nearest the camera, so you can watch them fill
+const cars = [
+  { obj:loco, back:0    },
+  { obj:carC, back:8.8  },
+  { obj:carA, back:16.0 },
+  { obj:carB, back:23.0 }
+];
+cars.forEach(c=>{ c.obj.position.y = 0.55; trainGroup.add(c.obj); });
+
+// headlight beam
+const headlight = new THREE.SpotLight(0xfff0c0, 90, 150, 0.34, 0.45, 1.4);
+headlight.position.set(0, 4.2, 4.0);
+loco.add(headlight);
+headlight.target.position.set(0, -1.5, 60);
+loco.add(headlight.target);
+const fireGlow = new THREE.PointLight(0xff7a20, 2.2, 12, 2);
+fireGlow.position.set(0, 2.2, -1.2);
+loco.add(fireGlow);
+
+/* ---------- cargo slots ---------- */
+const cargoSlots = [];
+function buildSlots(car){
+  const list = [];
+  const xs = [-0.62, 0.62], zs = [-2.25, -0.75, 0.75, 2.25], ys = [2.02, 2.92];
+  for(const y of ys) for(const z of zs) for(const x of xs)
+    list.push({ car, pos:new THREE.Vector3(x,y,z), filled:null });
+  return list;
+}
+[carA, carB].forEach(c=> cargoSlots.push(...buildSlots(c)));
+const CARGO_MAX = cargoSlots.length;
+
+/* ---------- smoke ---------- */
+const smokeGeo = new THREE.SphereGeometry(0.75, 7, 6);
+const smokePuffs = [];
+const smokeMat = new THREE.MeshStandardMaterial({
+  color:0xaebbd2, transparent:true, opacity:0.3, roughness:1, depthWrite:false });
+for(let i=0;i<40;i++){
+  const m = new THREE.Mesh(smokeGeo, smokeMat.clone());
+  m.visible = false; scene.add(m);
+  smokePuffs.push({ mesh:m, life:0, ttl:1 });
+}
+let smokeTimer = 0, smokeIdx = 0;
+
+/* =====================================================================
+   The crash — the whole train comes apart
+   ===================================================================== */
+const wreckGroup = new THREE.Group(); scene.add(wreckGroup);
+const debris = [];      // {m, v:Vector3, spin:Vector3, rest:boolean}
+const fireballs = [];   // {m, t, dur, s0, s1}
+let blastLight = null, wreckTime = 0, fxClock = 0, overlayShown = false;
+const crashCam = new THREE.Vector3();
+const _wp = new THREE.Vector3(), _wq = new THREE.Quaternion(), _ws = new THREE.Vector3();
+
+const fireGeo  = new THREE.SphereGeometry(1, 12, 10);
+const ringGeo  = new THREE.RingGeometry(0.75, 1, 36);
+const emberGeo = new THREE.BoxGeometry(0.3, 0.3, 0.3);
+const EMBER_COLORS = [0xffcf5a, 0xff8a2a, 0xff4b1e, 0x8a1119, 0x1a6b3e, 0xd8a93a, 0x2a2d36];
+
+/* pull every visible piece of the train out as a loose lump */
+function collectPieces(obj, out){
+  for(const child of obj.children){
+    if(child.isLight || !child.visible) continue;
+    if(child.userData.wheel){ out.push({ o:child, whole:true }); continue; }
+    if(child.isMesh) out.push({ o:child, whole:false });
+    if(child.children.length) collectPieces(child, out);
+  }
+}
+
+function explodeTrain(origin){
+  const pieces = [];
+  for(const c of cars){ c.obj.updateMatrixWorld(true); collectPieces(c.obj, pieces); }
+
+  for(const { o, whole } of pieces){
+    o.getWorldPosition(_wp); o.getWorldQuaternion(_wq); o.getWorldScale(_ws);
+    const m = whole ? o.clone() : new THREE.Mesh(o.geometry, o.material);
+    m.position.copy(_wp); m.quaternion.copy(_wq); m.scale.copy(_ws);
+    m.castShadow = false;
+    wreckGroup.add(m);
+
+    const dir = _wp.clone().sub(origin);
+    const dist = dir.length();
+    if(dist < 0.001) dir.set(rand(-1,1), 1, rand(-1,1));
+    dir.normalize();
+    const power = 30 / (1 + dist*0.09);
+    debris.push({
+      m,
+      v: new THREE.Vector3(
+        dir.x*power*rand(0.7,1.5) + rand(-4,4),
+        Math.abs(dir.y)*power*0.5 + rand(7,24)/(1+dist*0.045),
+        dir.z*power*rand(0.5,1.2) + G.speed*0.32*rand(0.3,1.0)),
+      spin: new THREE.Vector3(rand(-9,9), rand(-9,9), rand(-9,9)),
+      rest: false
+    });
+  }
+  for(const c of cars) c.obj.visible = false;
+
+  // loose embers on top of the structural debris
+  for(let i=0;i<70;i++){
+    const m = new THREE.Mesh(emberGeo, new THREE.MeshBasicMaterial({ color:pick(EMBER_COLORS) }));
+    m.position.copy(origin).add(new THREE.Vector3(rand(-2,2), rand(0,3), rand(-3,3)));
+    m.scale.setScalar(rand(0.5,2.2));
+    wreckGroup.add(m);
+    debris.push({
+      m,
+      v: new THREE.Vector3(rand(-26,26), rand(10,38), rand(-20,32)),
+      spin: new THREE.Vector3(rand(-14,14), rand(-14,14), rand(-14,14)),
+      rest: false
+    });
+  }
+
+  // fireballs
+  for(let i=0;i<7;i++){
+    const m = new THREE.Mesh(fireGeo, new THREE.MeshBasicMaterial({
+      color: i%2 ? 0xffb63c : 0xff5a1e, transparent:true, opacity:0.95,
+      blending:THREE.AdditiveBlending, depthWrite:false }));
+    m.position.copy(origin).add(new THREE.Vector3(rand(-2.5,2.5), rand(0.5,4), rand(-3,3)));
+    wreckGroup.add(m);
+    fireballs.push({ m, t:-i*0.045, dur:rand(0.45,0.85), s0:1.2, s1:rand(5,9) });
+  }
+  // ground shockwave
+  const ring = new THREE.Mesh(ringGeo, new THREE.MeshBasicMaterial({
+    color:0xffd9a0, transparent:true, opacity:0.75, side:THREE.DoubleSide,
+    blending:THREE.AdditiveBlending, depthWrite:false }));
+  ring.rotation.x = -Math.PI/2;
+  ring.position.set(origin.x, 0.4, origin.z);
+  wreckGroup.add(ring);
+  fireballs.push({ m:ring, t:0, dur:0.9, s0:1, s1:34, flat:true });
+
+  // flash
+  blastLight = new THREE.PointLight(0xffa040, 900, 220, 2);
+  blastLight.position.copy(origin).setY(origin.y + 4);
+  blastLight.userData = { peak:900, born:fxClock };
+  scene.add(blastLight);
+
+  // a pall of dark smoke over the wreck
+  for(let i=0;i<18;i++){
+    const pf = smokePuffs[smokeIdx++ % smokePuffs.length];
+    pf.mesh.visible = true;
+    pf.mesh.position.copy(origin).add(new THREE.Vector3(rand(-4,4), rand(0,4), rand(-4,4)));
+    pf.life = 0; pf.ttl = rand(2.4,4.2);
+    pf.vx = rand(-4,4); pf.vy = rand(3,9);
+    pf.mesh.material.opacity = 0.55;
+    pf.mesh.scale.setScalar(rand(0.8,2));
+    pf.wreck = true;
+  }
+}
+
+function clearWreck(){
+  for(const d of debris) wreckGroup.remove(d.m);
+  for(const f of fireballs){ wreckGroup.remove(f.m); f.m.material.dispose(); }
+  debris.length = 0; fireballs.length = 0;
+  if(blastLight){ scene.remove(blastLight); blastLight.dispose(); blastLight = null; }
+  for(const c of cars) c.obj.visible = true;
+  for(const pf of smokePuffs){ pf.mesh.visible = false; pf.wreck = false; }
+  wreckTime = 0; overlayShown = false;
+}
+
+/* Debris, fireballs, blast light and smoke. Runs both during play (vehicles blowing up)
+   and on the game-over screen (the train itself). */
+function updateEffects(dt){
+  fxClock += dt;
+  for(let i=debris.length-1;i>=0;i--){
+    const d = debris[i];
+    // during play the train leaves wreckage behind — bin it once it's out of sight
+    if(G.state === 'playing' && d.m.position.z < G.t - CFG.viewBehind){
+      wreckGroup.remove(d.m);
+      if(d.ownMat) d.m.material.dispose();
+      debris.splice(i,1); continue;
+    }
+    if(d.rest) continue;
+    d.v.y -= 34*dt;
+    d.m.position.addScaledVector(d.v, dt);
+    d.m.rotation.x += d.spin.x*dt; d.m.rotation.y += d.spin.y*dt; d.m.rotation.z += d.spin.z*dt;
+    const floor = 0.22;
+    if(d.m.position.y < floor){
+      d.m.position.y = floor;
+      if(Math.abs(d.v.y) < 3.5 && d.v.lengthSq() < 40){ d.rest = true; d.v.set(0,0,0); }
+      else { d.v.y = -d.v.y*0.32; d.v.x *= 0.62; d.v.z *= 0.62; d.spin.multiplyScalar(0.5); }
+    }
+  }
+
+  for(let i=fireballs.length-1;i>=0;i--){
+    const f = fireballs[i];
+    f.t += dt;
+    if(f.t < 0) continue;
+    const e = clamp(f.t/f.dur, 0, 1);
+    const s = lerp(f.s0, f.s1, f.flat ? Math.sqrt(e) : e*(2-e));
+    if(f.flat) f.m.scale.set(s, s, 1); else f.m.scale.setScalar(s);
+    f.m.material.opacity = (f.flat ? 0.75 : 0.95) * (1-e)*(1-e);
+    if(e >= 1){ wreckGroup.remove(f.m); f.m.material.dispose(); fireballs.splice(i,1); }
+  }
+
+  if(blastLight){
+    blastLight.intensity = Math.max(0, blastLight.userData.peak * Math.pow(1 - clamp((fxClock - blastLight.userData.born)/0.55,0,1), 2));
+    if(blastLight.intensity <= 0.5){ scene.remove(blastLight); blastLight.dispose(); blastLight = null; }
+  }
+
+  for(const pf of smokePuffs){
+    if(!pf.mesh.visible) continue;
+    pf.life += dt;
+    const e = pf.life/pf.ttl;
+    if(e >= 1){ pf.mesh.visible = false; continue; }
+    pf.mesh.position.y += pf.vy*dt;
+    pf.mesh.position.x += pf.vx*dt;
+    if(!pf.wreck) pf.mesh.position.z -= (10 + G.speed*0.28)*dt;
+    pf.mesh.scale.setScalar((pf.wreck ? 1.4 : 0.35) + e*(pf.wreck ? 5 : 1.35));
+    pf.mesh.material.opacity = (pf.wreck ? 0.5 : 0.3)*(1-e)*(1-e);
+  }
+}
+
+function updateWreck(dt){
+  wreckTime += dt;
+  updateEffects(dt);
+
+  // ease the camera back to take in the wreckage
+  const k = Math.min(1, wreckTime/3.5);
+  camera.position.set(
+    crashCam.x - 6*k + Math.sin(wreckTime*22)*Math.max(0, 0.5-wreckTime)*1.2,
+    crashCam.y + 7*k,
+    crashCam.z - 12*k);
+  camLook.lerp(_v.set(G.crashX, 2.4, G.t + 2), Math.min(1, dt*2));
+  camera.lookAt(camLook);
+  skyGroup.position.set(camera.position.x, 0, camera.position.z);
+
+  if(!overlayShown && wreckTime > 1.5){ overlayShown = true; showGameOver(); }
+}
+
+/* =====================================================================
+   Present thieves — cars and trucks that pull alongside and rob the wagons
+   ===================================================================== */
+const thiefGroup = new THREE.Group(); scene.add(thiefGroup);
+const thiefMat = new THREE.MeshStandardMaterial({ vertexColors:true, roughness:0.5, metalness:0.28, flatShading:true });
+const lampMat  = new THREE.MeshBasicMaterial({ color:0xfff2b0 });
+const tailMat  = new THREE.MeshBasicMaterial({ color:0xff2a1e });
+
+/* a squat road wheel */
+function roadWheel(parent, x, y, z, r){
+  const w = new THREE.Mesh(new THREE.CylinderGeometry(r, r, 0.34, 12), MATS.black);
+  w.rotation.z = Math.PI/2;
+  w.position.set(x, y, z);
+  parent.add(w);
+  const hub = new THREE.Mesh(new THREE.CylinderGeometry(r*0.4, r*0.4, 0.38, 8), MATS.silver);
+  hub.rotation.z = Math.PI/2; hub.position.set(x, y, z);
+  parent.add(hub);
+  return w;
+}
+
+/* getaway car: low, fast, room for two presents */
+function buildThiefCar(){
+  const g = new THREE.Group();
+  const body = 0x23262e, trim = 0x9a1420;
+  const parts = [
+    { geo:UNIT_BOX, color:body, matrix:boxMatrix(0, 0.95, 0,   2.3, 0.85, 5.0) },
+    { geo:UNIT_BOX, color:body, matrix:boxMatrix(0, 1.62, 0.7, 2.0, 0.95, 2.2) },  // cabin
+    { geo:UNIT_BOX, color:0x0b1018, matrix:boxMatrix(0, 1.7, 1.82, 1.8, 0.62, 0.1) },
+    { geo:UNIT_BOX, color:trim, matrix:boxMatrix(0, 1.2, 0, 2.34, 0.16, 5.04) },
+    { geo:UNIT_BOX, color:0x14171d, matrix:boxMatrix(0, 1.28, -1.6, 2.1, 0.2, 1.9) }, // open boot
+    { geo:UNIT_BOX, color:trim, matrix:boxMatrix(0, 1.5, -2.55, 2.1, 0.5, 0.16) }
+  ];
+  const m = new THREE.Mesh(mergeParts(parts), thiefMat);
+  m.castShadow = true; g.add(m);
+  for(const s of [-1,1]){
+    const l = new THREE.Mesh(UNIT_BOX, lampMat);
+    l.scale.set(0.42,0.24,0.12); l.position.set(s*0.75, 1.15, 2.53); g.add(l);
+    const tl = new THREE.Mesh(UNIT_BOX, tailMat);
+    tl.scale.set(0.34,0.2,0.1); tl.position.set(s*0.8, 1.3, -2.6); g.add(tl);
+  }
+  const wheels = [];
+  for(const z of [1.55,-1.55]) for(const s of [-1,1]) wheels.push(roadWheel(g, s*1.16, 0.55, z, 0.55));
+  g.userData = { wheels, body:m, lootSlots:[ new THREE.Vector3(-0.5,1.75,-1.6), new THREE.Vector3(0.5,1.75,-1.6) ], half:2.7 };
+  return g;
+}
+
+/* box truck: slower, but hauls six */
+function buildThiefTruck(){
+  const g = new THREE.Group();
+  const body = 0x2c2118, trim = 0x8d1a12;
+  const parts = [
+    { geo:UNIT_BOX, color:body,    matrix:boxMatrix(0, 1.15, 0,    2.7, 0.7, 8.4) },   // chassis
+    { geo:UNIT_BOX, color:0x39424f,matrix:boxMatrix(0, 2.05, 2.9,  2.7, 2.1, 2.6) },   // cab
+    { geo:UNIT_BOX, color:0x0b1018,matrix:boxMatrix(0, 2.3, 4.22,  2.3, 0.9, 0.12) },
+    { geo:UNIT_BOX, color:body,    matrix:boxMatrix(0, 1.62, -1.1, 2.8, 0.3, 5.8) },   // deck
+    { geo:UNIT_BOX, color:trim,    matrix:boxMatrix(0, 2.1, -4.0,  2.8, 1.3, 0.2) },   // headboard
+    { geo:UNIT_BOX, color:trim,    matrix:boxMatrix(-1.4, 2.0, -1.1, 0.2, 1.0, 5.8) },
+    { geo:UNIT_BOX, color:trim,    matrix:boxMatrix( 1.4, 2.0, -1.1, 0.2, 1.0, 5.8) },
+    { geo:UNIT_BOX, color:0x151a22,matrix:boxMatrix(0, 3.2, 3.0,  2.4, 0.2, 2.2) }
+  ];
+  const m = new THREE.Mesh(mergeParts(parts), thiefMat);
+  m.castShadow = true; g.add(m);
+  for(const s of [-1,1]){
+    const l = new THREE.Mesh(UNIT_BOX, lampMat);
+    l.scale.set(0.5,0.3,0.14); l.position.set(s*0.95, 1.5, 4.25); g.add(l);
+    const tl = new THREE.Mesh(UNIT_BOX, tailMat);
+    tl.scale.set(0.36,0.24,0.12); tl.position.set(s*1.1, 1.7, -4.1); g.add(tl);
+  }
+  const wheels = [];
+  for(const z of [3.0, -1.4, -3.0]) for(const s of [-1,1]) wheels.push(roadWheel(g, s*1.34, 0.68, z, 0.68));
+  const slots = [];
+  for(const z of [0.6, -1.1, -2.8]) for(const x of [-0.62, 0.62]) slots.push(new THREE.Vector3(x, 2.25, z));
+  g.userData = { wheels, body:m, lootSlots:slots, half:4.4 };
+  return g;
+}
+
+const pursuers = [];
+
+function spawnPursuer(){
+  const truck = Math.random() < 0.42;
+  const g = truck ? buildThiefTruck() : buildThiefCar();
+  thiefGroup.add(g);
+  const side = Math.random() < 0.5 ? 1 : -1;
+  const hp = truck ? CFG.truckHP : CFG.carHP;
+  // its own body material so it can flash white when hit
+  g.userData.body.material = thiefMat.clone();
+  // stagger the attack position so a pack of raiders queues up along the train
+  // instead of all piling onto the same spot
+  const sameSide = pursuers.filter(q => q.side === side && q.state !== 'fleeing').length;
+  const p = {
+    group:g, truck, side,
+    t: G.t - rand(52, 100),
+    speed: G.speed + rand(9, 15),
+    offset: 26 + rand(0, 12),
+    state: 'closing',
+    loot: [],
+    lootMax: g.userData.lootSlots.length,
+    stealTimer: rand(0.6, 1.2),
+    dead: false,
+    hp, maxHp: hp, hitFlash: 0,
+    // where it wants to sit: how far back beside the train, and how far out to the side
+    alongside: (truck ? 19 : 12) + sameSide * (truck ? 8 : 6) + rand(-1.5, 1.5),
+    wantOffset: 6.4 + (truck ? 1.1 : 0) + (sameSide % 2) * 3.0 + rand(-0.3, 0.3)
+  };
+  pursuers.push(p);
+  Sfx.alarm();
+  if(pursuers.length === 1)
+    showToast('THIEVES!', 'hold SPACE to fire the snow cannon');
+  return p;
+}
+
+function retirePursuer(p){
+  for(const m of p.loot) m.parent && m.parent.remove(m);
+  const mat = p.group.userData.body && p.group.userData.body.material;
+  if(mat && mat !== thiefMat) mat.dispose();
+  thiefGroup.remove(p.group);
+}
+
+function clearPursuers(){
+  for(const p of pursuers) retirePursuer(p);
+  pursuers.length = 0;
+  G.target = null;
+}
+
+/* take the last present off the train and stack it on the thief's deck */
+function stealPresent(p){
+  let slot = null;
+  for(let i=cargoSlots.length-1;i>=0;i--) if(cargoSlots[i].filled){ slot = cargoSlots[i]; break; }
+  if(!slot) return false;
+
+  const mesh = slot.filled;
+  slot.filled = null;
+  G.cargo--;
+  G.score = Math.max(0, G.score - 60);
+
+  p.group.updateMatrixWorld(true);
+  mesh.getWorldPosition(_wp);
+  const local = p.group.worldToLocal(_wp.clone());
+  p.group.add(mesh);
+  mesh.position.copy(local);
+  const dest = p.group.userData.lootSlots[p.loot.length] || p.group.userData.lootSlots[0];
+  p.loot.push(mesh);
+  G.flying.push({ m:mesh, from:local.clone(), to:dest.clone(), t:0, dur:0.4,
+                  arc:2.4, rot0:mesh.rotation.y, rot1:rand(-0.6,0.6), tilt:rand(-0.2,0.2) });
+  Sfx.steal();
+  updateCargoUI();
+  return true;
+}
+
+function updatePursuit(dt){
+  // Raids intensify with distance: the gap between waves shrinks and waves arrive in
+  // bigger packs, so late in a run you're fending off a swarm.
+  G.raidTimer -= dt;
+  if(G.t > CFG.raidStart && G.cargo >= 3 && pursuers.length < CFG.maxPursuers && G.raidTimer <= 0){
+    const intensity = clamp((G.t - CFG.raidStart) / 6000, 0, 1);   // 0 near the start → 1 by ~6.5 km
+    G.raidTimer = lerp(CFG.raidGapMax, CFG.raidGapMin, intensity) * rand(0.7, 1.15);
+    const pack = 1 + (Math.random() < intensity*0.8 ? 1 : 0) + (Math.random() < intensity*0.5 ? 1 : 0);
+    for(let k=0; k<pack && pursuers.length < CFG.maxPursuers; k++) spawnPursuer();
+  }
+
+  for(let i=pursuers.length-1;i>=0;i--){
+    const p = pursuers[i];
+
+    if(p.state === 'fleeing'){
+      p.speed += (G.speed - 26) * dt * 0.8;
+      p.offset += 26*dt;
+      p.t -= 16*dt;
+      if(p.offset > 90 || p.t < G.t - 170){
+        retirePursuer(p);
+        pursuers.splice(i,1);
+        if(G.target === p) G.target = null;
+        continue;
+      }
+    } else {
+      // close the gap, then hold station beside the wagons
+      const wantT = G.t - p.alongside;
+      const gap = wantT - p.t;
+      p.speed = G.speed + clamp(gap*0.85, -16, 20);
+      p.offset += (p.wantOffset - p.offset) * Math.min(1, dt*0.75);
+
+      if(Math.abs(gap) < 9 && p.offset < p.wantOffset + 2.5){
+        p.state = 'raiding';
+        p.stealTimer -= dt;
+        if(p.stealTimer <= 0){
+          p.stealTimer = p.truck ? rand(1.5,2.1) : rand(1.0,1.5);
+          if(!stealPresent(p)){
+            p.state = 'fleeing';                    // nothing left worth taking
+          } else if(p.loot.length >= p.lootMax){
+            p.state = 'fleeing';                    // full up, away it goes
+            G.score = Math.max(0, G.score - 120);
+          }
+        }
+      } else if(p.state !== 'closing'){
+        p.state = 'closing';
+      }
+    }
+
+    p.t += p.speed * dt;
+
+    // ride alongside the train, following its lateral weave through the junctions
+    const trainOff = historyX(p.t);
+    const x = pathX(p.t) + trainOff + p.side * p.offset;
+    const x2 = pathX(p.t+3) + historyX(p.t+3) + p.side * p.offset;
+    p.group.position.set(x, 0, p.t);
+    p.group.rotation.y = Math.atan2(x2 - x, 3);
+    for(const w of p.group.userData.wheels) w.rotation.x -= p.speed*dt/0.6;
+
+    // damage flash + a low ride of health shown by darkening the body as it weakens
+    if(p.hitFlash > 0) p.hitFlash -= dt;
+    const em = p.group.userData.body.material.emissive;
+    if(em){
+      const f = Math.max(0, p.hitFlash / 0.18);
+      em.setRGB(f, f, f);
+    }
+  }
+
+  // auto-aim picks the closest live raider
+  let best = null, bestD = 1e9;
+  for(const p of pursuers){
+    if(p.state === 'fleeing') continue;
+    const d = Math.abs(p.t - G.t) + p.offset*0.4;
+    if(d < bestD && Math.abs(p.t - G.t) < CFG.gunRange){ bestD = d; best = p; }
+  }
+  G.target = best;
+}
+
+/* =====================================================================
+   The snow cannon
+   ===================================================================== */
+let turretYaw = null, turretPitch = null, muzzle = null, muzzleFlash = null;
+function buildTurret(){
+  const base = new THREE.Group();
+  const plinth = new THREE.Mesh(mergeParts([
+    { geo:UNIT_BOX, color:0x8d1a12, matrix:boxMatrix(0, 0.12, 0, 2.4, 0.24, 2.6) },
+    { geo:new THREE.CylinderGeometry(0.85,1.0,0.3,12), color:0xd8a93a, matrix:boxMatrix(0,0.36,0,1,1,1) }
+  ]), thiefMat);
+  base.add(plinth);
+
+  const yaw = new THREE.Group(); yaw.position.y = 0.5; base.add(yaw);
+  const pitch = new THREE.Group(); pitch.position.y = 0.42; yaw.add(pitch);
+
+  // brass cannon with a candy-cane wrap
+  const barrel = [];
+  barrel.push({ geo:new THREE.CylinderGeometry(0.62,0.7,0.85,12), color:0xd8a93a, matrix:boxMatrix(0,0,0,1,1,1) });
+  for(let i=0;i<7;i++)
+    barrel.push({ geo:new THREE.CylinderGeometry(0.26,0.26,0.42,10), color: i%2 ? 0xd6202c : 0xf2f6ff,
+                  matrix:boxMatrix(0, 0, 0.55 + i*0.42, 1,1,1, Math.PI/2, 0, 0) });
+  barrel.push({ geo:new THREE.TorusGeometry(0.3,0.09,7,14), color:0xd8a93a, matrix:boxMatrix(0,0,3.5,1,1,1) });
+  const bm = new THREE.Mesh(mergeParts(barrel), thiefMat);
+  bm.castShadow = true; pitch.add(bm);
+
+  muzzle = new THREE.Object3D(); muzzle.position.set(0, 0, 3.7); pitch.add(muzzle);
+  muzzleFlash = new THREE.Mesh(new THREE.SphereGeometry(0.75, 10, 8),
+    new THREE.MeshBasicMaterial({ color:0xbfe6ff, transparent:true, opacity:0, blending:THREE.AdditiveBlending, depthWrite:false }));
+  muzzleFlash.position.copy(muzzle.position); pitch.add(muzzleFlash);
+
+  turretYaw = yaw; turretPitch = pitch;
+  return base;
+}
+
+// the cannon rides on the roof of the van, right behind the loco
+const turret = buildTurret();
+turret.position.set(0, 5.12, -0.3);
+carC.add(turret);
+
+const shells = [];
+const shellGeo = new THREE.SphereGeometry(0.34, 10, 8);
+const shellMat = new THREE.MeshBasicMaterial({ color:0xdff2ff });
+
+function fireGun(){
+  if(G.state !== 'playing' || G.fireCd > 0) return;
+  G.fireCd = CFG.fireCooldown;
+
+  muzzle.updateMatrixWorld(true);
+  const from = new THREE.Vector3().setFromMatrixPosition(muzzle.matrixWorld);
+  const target = G.target;
+  const to = target
+    ? target.group.position.clone().setY(1.6)
+    : from.clone().add(new THREE.Vector3(0, 6, 90));
+
+  const m = new THREE.Mesh(shellGeo, shellMat);
+  m.position.copy(from);
+  scene.add(m);
+  shells.push({ m, from, target, to, t:0, dur: target ? clamp(from.distanceTo(to)/150, 0.12, 0.4) : 0.7 });
+
+  muzzleFlash.material.opacity = 0.95;
+  Sfx.cannon();
+}
+
+/* a shell connects: chip HP, spark and recoil; only destroy at zero */
+function hitPursuer(p){
+  if(p.dead) return;
+  p.hp--;
+  p.hitFlash = 0.18;
+  const pos = p.group.position.clone().setY(1.6);
+  hitSparks(pos);
+  if(p.hp <= 0){ killPursuer(p); return; }
+  Sfx.clang();
+  G.score += 25;                 // a little credit for landing a hit
+  p.stealTimer += 0.5;           // knock it off its rhythm
+}
+
+function hitSparks(pos){
+  for(let i=0;i<10;i++){
+    const m = new THREE.Mesh(emberGeo, new THREE.MeshBasicMaterial({ color: pick([0xffe08a,0xbfe6ff,0xffffff]) }));
+    m.position.copy(pos).add(new THREE.Vector3(rand(-0.6,0.6), rand(-0.3,0.9), rand(-0.6,0.6)));
+    m.scale.setScalar(rand(0.3,0.8));
+    wreckGroup.add(m);
+    debris.push({ m, ownMat:true,
+      v:new THREE.Vector3(rand(-10,10), rand(6,16), rand(-8,10) + G.speed*0.2),
+      spin:new THREE.Vector3(rand(-16,16), rand(-16,16), rand(-16,16)), rest:false });
+  }
+}
+
+function killPursuer(p){
+  if(p.dead) return;
+  p.dead = true;
+  const pos = p.group.position.clone().setY(1.4);
+
+  // its haul comes flying back to the wagons
+  for(const m of p.loot){
+    m.parent && m.parent.remove(m);
+    let slot = null;
+    for(const s of cargoSlots) if(!s.filled){ slot = s; break; }
+    if(!slot) continue;
+    slot.car.updateMatrixWorld(true);
+    const local = slot.car.worldToLocal(pos.clone());
+    slot.car.add(m);
+    m.position.copy(local);
+    m.scale.setScalar(0.92);
+    slot.filled = m;
+    G.cargo++;
+    G.flying.push({ m, from:local.clone(), to:slot.pos.clone(), t:0, dur:rand(0.45,0.7),
+                    arc:rand(3,5), rot0:m.rotation.y, rot1:rand(-0.6,0.6), tilt:rand(-0.25,0.25) });
+  }
+  p.loot.length = 0;
+  updateCargoUI();
+
+  smallExplosion(pos, p.truck);
+  G.score += p.truck ? 400 : 250;
+  G.kills++;
+
+  const mat = p.group.userData.body && p.group.userData.body.material;
+  if(mat && mat !== thiefMat) mat.dispose();
+  thiefGroup.remove(p.group);
+  const i = pursuers.indexOf(p);
+  if(i >= 0) pursuers.splice(i,1);
+  if(G.target === p) G.target = null;
+}
+
+function smallExplosion(pos, big){
+  const n = big ? 34 : 22;
+  for(let i=0;i<n;i++){
+    const m = new THREE.Mesh(emberGeo, new THREE.MeshBasicMaterial({ color:pick(EMBER_COLORS) }));
+    m.position.copy(pos).add(new THREE.Vector3(rand(-1,1), rand(0,1.5), rand(-1.5,1.5)));
+    m.scale.setScalar(rand(0.5,1.9));
+    wreckGroup.add(m);
+    debris.push({ m, ownMat:true,
+      v:new THREE.Vector3(rand(-18,18), rand(9,26), rand(-14,18) + G.speed*0.25),
+      spin:new THREE.Vector3(rand(-12,12), rand(-12,12), rand(-12,12)), rest:false });
+  }
+  for(let i=0;i<4;i++){
+    const m = new THREE.Mesh(fireGeo, new THREE.MeshBasicMaterial({
+      color: i%2 ? 0xffb63c : 0xff5a1e, transparent:true, opacity:0.95,
+      blending:THREE.AdditiveBlending, depthWrite:false }));
+    m.position.copy(pos).add(new THREE.Vector3(rand(-1,1), rand(0,1.5), rand(-1,1)));
+    wreckGroup.add(m);
+    fireballs.push({ m, t:-i*0.04, dur:rand(0.35,0.6), s0:0.8, s1:big?5.5:4 });
+  }
+  if(blastLight){ scene.remove(blastLight); blastLight.dispose(); }
+  blastLight = new THREE.PointLight(0xffa040, big?420:300, 120, 2);
+  blastLight.position.copy(pos).setY(pos.y + 3);
+  blastLight.userData = { peak: big?420:300, born: fxClock };
+  scene.add(blastLight);
+}
+
+function updateGun(dt){
+  if(G.fireCd > 0) G.fireCd -= dt;
+  if(G.fireHeld) fireGun();
+
+  // swing the cannon onto the target
+  const t = G.target;
+  let wantYaw = 0, wantPitch = -0.06;
+  if(t){
+    cars[1].obj.updateMatrixWorld(true);
+    const local = cars[1].obj.worldToLocal(t.group.position.clone().setY(1.6));
+    wantYaw = Math.atan2(local.x, local.z);
+    wantPitch = -Math.atan2(4.4, Math.hypot(local.x, local.z));
+  }
+  let d = wantYaw - turretYaw.rotation.y;
+  while(d >  Math.PI) d -= Math.PI*2;
+  while(d < -Math.PI) d += Math.PI*2;
+  turretYaw.rotation.y += d * Math.min(1, dt*7);
+  turretPitch.rotation.x += (wantPitch - turretPitch.rotation.x) * Math.min(1, dt*6);
+  muzzleFlash.material.opacity = Math.max(0, muzzleFlash.material.opacity - dt*6);
+
+  for(let i=shells.length-1;i>=0;i--){
+    const s = shells[i];
+    s.t += dt;
+    const e = clamp(s.t/s.dur, 0, 1);
+    if(s.target && !s.target.dead) s.to.copy(s.target.group.position).setY(1.6);
+    s.m.position.lerpVectors(s.from, s.to, e);
+    s.m.position.y += Math.sin(Math.PI*e)*1.6;
+    if(e >= 1){
+      if(s.target && !s.target.dead && pursuers.includes(s.target)) hitPursuer(s.target);
+      scene.remove(s.m);
+      shells.splice(i,1);
+    }
+  }
+}
+
+/* =====================================================================
+   Game state
+   ===================================================================== */
+const G = {
+  state:'ready',        // ready | playing | paused
+  t: 0,                 // distance travelled along the track
+  speed: 0,
+  laneIdx: 0,
+  laneX: 0,             // current lateral offset (smoothed)
+  targetX: 0,
+  score: 0,
+  presents: 0,
+  cargo: 0,
+  deliveries: 0,
+  combo: 0,
+  comboTimer: 0,
+  curSeg: null,
+  canSwitch: false,
+  pendingDir: 0,
+  pendingTime: -99,
+  raidTimer: 0,
+  fireCd: 0,
+  fireHeld: false,
+  target: null,
+  kills: 0,
+  history: [],          // {s, x} lateral history for the carriages
+  flying: [],
+  dissolving: []
+};
+
+function resetGame(){
+  // wipe track
+  for(const seg of track.segs){ disposeSegment(seg); if(seg.props) seg.props.forEach(p=>sceneryGroup.remove(p)); }
+  track.segs.length = 0; track.tEnd = -120; track.phase = 'single'; track.lanes = [0]; track.first = true;
+  // wipe presents
+  for(const p of presents){ scene.remove(p.group); p.spark.material.dispose(); p.beam.material.dispose(); }
+  presents.length = 0;
+  clearHazards();
+  clearWreck();
+  clearPursuers();
+  for(const s of shells) scene.remove(s.m);
+  shells.length = 0;
+  if(turretYaw){ turretYaw.rotation.y = 0; turretPitch.rotation.x = -0.06; muzzleFlash.material.opacity = 0; }
+  // wipe cargo
+  for(const s of cargoSlots){ if(s.filled){ s.filled.parent && s.filled.parent.remove(s.filled); s.filled = null; } }
+  G.flying.forEach(f=> f.m.parent && f.m.parent.remove(f.m));
+  G.flying.length = 0; G.dissolving.forEach(d=> d.m.parent && d.m.parent.remove(d.m)); G.dissolving.length = 0;
+
+  Object.assign(G, {
+    t:0, speed:0, laneIdx:0, laneX:0, targetX:0, score:0, presents:0, cargo:0,
+    deliveries:0, combo:0, comboTimer:0, curSeg:null, canSwitch:false,
+    pendingDir:0, pendingTime:-99, crashX:0,
+    raidTimer:rand(CFG.raidGapMin, CFG.raidGapMax), fireCd:0, fireHeld:false, target:null, kills:0
+  });
+  G.history = [{ s:-200, x:0 }];
+
+  // pre-build the first stretch
+  while(track.tEnd < CFG.viewAhead) addSegment();
+  G.curSeg = segmentAt(0);
+
+  positionTrain(0);
+  updateHUD();
+  updateCargoUI();
+}
+
+/* =====================================================================
+   Positioning
+   ===================================================================== */
+function segmentAt(t){
+  for(const s of track.segs) if(t >= s.t0 && t < s.t1) return s;
+  return track.segs[track.segs.length-1];
+}
+
+function historyX(s){
+  const h = G.history;
+  if(h.length === 0) return 0;
+  if(s >= h[h.length-1].s) return h[h.length-1].x;
+  if(s <= h[0].s) return h[0].x;
+  // walk from the back (cars are near the end of the buffer)
+  for(let i=h.length-1;i>0;i--){
+    if(h[i-1].s <= s){
+      const f = (s - h[i-1].s) / Math.max(0.0001, h[i].s - h[i-1].s);
+      return lerp(h[i-1].x, h[i].x, f);
+    }
+  }
+  return h[0].x;
+}
+
+function positionTrain(dt){
+  const t = G.t;
+  const locoX = pathX(t) + G.laneX;
+
+  // record lateral history
+  const h = G.history;
+  if(h.length === 0 || t - h[h.length-1].s > 0.6) h.push({ s:t, x:G.laneX });
+  while(h.length > 2 && h[1].s < t - 60) h.shift();
+
+  for(const c of cars){
+    const s = t - c.back;
+    const off = c === cars[0] ? G.laneX : historyX(s);
+    const x = pathX(s) + off;
+    // yaw from a short look-ahead
+    const s2 = s + 2.5;
+    const x2 = pathX(s2) + (c === cars[0] ? G.laneX : historyX(s2));
+    c.obj.position.set(x, 0.55, s);
+    c.obj.rotation.y = Math.atan2(x2 - x, 2.5);
+  }
+  trainGroup.updateMatrixWorld(true);
+
+  // wheels + rods
+  if(dt > 0){
+    const rot = (G.speed * dt);
+    for(const c of cars){
+      const w = c.obj.userData.wheels || [];
+      for(const wheel of w) wheel.rotation.x -= rot / 0.8;
+    }
+    const ph = (G.t / 0.85);
+    const rods = loco.userData.rods;
+    rods[0].position.y = 0.85 + Math.sin(ph)*0.42;
+    rods[0].position.z = -0.55 + Math.cos(ph)*0.42;
+    rods[1].position.y = 0.85 + Math.sin(ph+Math.PI)*0.42;
+    rods[1].position.z = -0.55 + Math.cos(ph+Math.PI)*0.42;
+  }
+  return locoX;
+}
+
+/* =====================================================================
+   Cargo
+   ===================================================================== */
+const _wv = new THREE.Vector3();
+function nextSlot(){ for(const s of cargoSlots) if(!s.filled) return s; return null; }
+
+function collectPresent(p){
+  p.taken = true;
+  scene.remove(p.group);
+  p.group.remove(p.box);
+  p.spark.material.dispose(); p.beam.material.dispose();
+
+  G.presents++;
+  G.combo = Math.min(G.combo + 1, 12);
+  G.comboTimer = 2.6;
+  G.score += 100 + G.combo * 10;
+  Sfx.ding(G.combo);
+
+  const slot = nextSlot();
+  if(!slot) return;   // wagons momentarily full — the points still count
+
+  const car = slot.car;
+  car.updateMatrixWorld(true);
+  p.box.getWorldPosition(_wv);
+  const local = car.worldToLocal(_wv.clone());
+  car.add(p.box);
+  p.box.position.copy(local);
+  p.box.scale.setScalar(0.92);
+  p.box.castShadow = true;
+  slot.filled = p.box;
+  G.cargo++;
+
+  G.flying.push({
+    m: p.box, from: local.clone(), to: slot.pos.clone(),
+    t: 0, dur: rand(0.42,0.6), arc: rand(2.6,4.2),
+    rot0: p.box.rotation.y, rot1: rand(-0.6,0.6), tilt: rand(-0.25,0.25)
+  });
+
+  if(G.cargo >= CARGO_MAX) deliver();
+  updateCargoUI();
+}
+
+/* =====================================================================
+   Hitting a boulder
+   ===================================================================== */
+function crash(hazard){
+  if(G.state !== 'playing') return;
+  G.state = 'over';
+  G.crashX = hazard.x;
+  G.canSwitch = false;
+  ui.choice.classList.remove('on');
+  ui.toast.classList.remove('on');
+
+  // the rock takes the hit too
+  hazard.group.remove(hazard.beam);
+  hazard.group.remove(hazard.sign);
+
+  clearPursuers();
+  for(const s of shells) scene.remove(s.m);
+  shells.length = 0;
+
+  crashCam.copy(camera.position);
+  camLook.set(hazard.x, 2.5, hazard.t);
+
+  const origin = new THREE.Vector3(hazard.x, 2.2, hazard.t);
+  explodeTrain(origin);          // reads G.speed for the forward fling
+  G.speed = 0;
+
+  Sfx.init(); Sfx.explode();
+  const fl = document.getElementById('flash');
+  fl.classList.remove('bang'); void fl.offsetWidth; fl.classList.add('bang');
+
+  ui.btnPause.disabled = true;
+  ui.btnStart.disabled = false;
+  updateHUD();
+}
+
+function showGameOver(){
+  ui.cardTitle.textContent = 'WRECKED!';
+  ui.cardSub.textContent = 'you hit the boulder';
+  ui.card.classList.add('wrecked');
+  ui.cardText.textContent = 'The Express is scattered across the snow. Watch for the red warning beam at a junction — one branch is always blocked, and one is always clear.';
+  ui.finalScore.style.display = 'block';
+  ui.finalScore.innerHTML = 'Final score <b>'+Math.floor(G.score).toLocaleString()+'</b> &nbsp;&bull;&nbsp; '
+    + G.presents + ' presents &nbsp;&bull;&nbsp; ' + G.deliveries + (G.deliveries===1?' delivery':' deliveries')
+    + ' &nbsp;&bull;&nbsp; ' + G.kills + ' thieves hit &nbsp;&bull;&nbsp; ' + Math.floor(G.t) + ' m';
+  ui.btnGo.textContent = 'Run Again';
+  ui.overlay.classList.remove('hidden');
+}
+
+function deliver(){
+  G.deliveries++;
+  const bonus = 1000 + G.deliveries*250;
+  G.score += bonus;
+  Sfx.jingle();
+  showToast('DELIVERED!', '+' + bonus + ' &nbsp;&bull;&nbsp; wagons emptied');
+  for(const s of cargoSlots){
+    if(s.filled){
+      G.dissolving.push({ m:s.filled, t:0, dur:0.5, s0:s.filled.scale.x });
+      s.filled = null;
+    }
+  }
+  G.flying.length = 0;
+  G.cargo = 0;
+}
+
+/* =====================================================================
+   Input
+   ===================================================================== */
+function steer(dir){
+  if(G.state !== 'playing') return;
+  if(G.canSwitch && G.curSeg && G.curSeg.lanes.length > 1){
+    const n = G.curSeg.lanes.length;
+    const nu = clamp(G.laneIdx + dir, 0, n-1);
+    if(nu !== G.laneIdx){ G.laneIdx = nu; Sfx.tone(300, Sfx.ctx?Sfx.ctx.currentTime:0, 0.09, 'square', 0.25, 460); }
+  }else{
+    G.pendingDir = dir;
+    G.pendingTime = performance.now()/1000;
+  }
+}
+
+window.addEventListener('keydown', e=>{
+  const k = e.key.toLowerCase();
+  // fire: held down for continuous shooting, so this one ignores the repeat guard
+  if(k === ' ' || k === 'f'){
+    e.preventDefault();
+    if(G.state === 'ready' || G.state === 'over'){ if(!e.repeat) startGame(); }
+    else G.fireHeld = true;
+    return;
+  }
+  if(e.repeat) return;
+  if(k === 'arrowleft' || k === 'a'){ steer(-1); e.preventDefault(); }
+  else if(k === 'arrowright' || k === 'd'){ steer(1); e.preventDefault(); }
+  else if(k === 'p' || k === 'escape'){ e.preventDefault(); togglePause(); }
+  else if(k === 'r'){ hardReset(); }
+});
+window.addEventListener('keyup', e=>{
+  const k = e.key.toLowerCase();
+  if(k === ' ' || k === 'f') G.fireHeld = false;
+});
+window.addEventListener('blur', ()=>{ G.fireHeld = false; });
+
+document.querySelector('#touch .l').addEventListener('pointerdown', e=>{ e.preventDefault(); steer(-1); });
+document.querySelector('#touch .r').addEventListener('pointerdown', e=>{ e.preventDefault(); steer(1); });
+if(('ontouchstart' in window) || navigator.maxTouchPoints > 0) document.body.classList.add('touch');
+const fireBtn = document.getElementById('fireBtn');
+fireBtn.addEventListener('pointerdown', e=>{ e.preventDefault(); G.fireHeld = true; });
+fireBtn.addEventListener('pointerup',   e=>{ e.preventDefault(); G.fireHeld = false; });
+fireBtn.addEventListener('pointerleave',()=>{ G.fireHeld = false; });
+fireBtn.addEventListener('pointercancel',()=>{ G.fireHeld = false; });
+
+/* =====================================================================
+   UI
+   ===================================================================== */
+const ui = {
+  score: document.getElementById('uiScore'),
+  presents: document.getElementById('uiPresents'),
+  dist: document.getElementById('uiDist'),
+  speed: document.getElementById('uiSpeed'),
+  cargoTxt: document.getElementById('uiCargoTxt'),
+  cargoFill: document.getElementById('cargoFill'),
+  choice: document.getElementById('choice'),
+  reticle: document.getElementById('reticle'),
+  hp: document.getElementById('hp'),
+  kills: document.getElementById('uiKills'),
+  toast: document.getElementById('toast'),
+  overlay: document.getElementById('overlay'),
+  card: document.getElementById('card'),
+  cardTitle: document.getElementById('cardTitle'),
+  cardSub: document.getElementById('cardSub'),
+  cardText: document.getElementById('cardText'),
+  finalScore: document.getElementById('finalScore'),
+  btnGo: document.getElementById('btnGo'),
+  btnStart: document.getElementById('btnStart'),
+  btnPause: document.getElementById('btnPause'),
+  btnReset: document.getElementById('btnReset'),
+  btnSound: document.getElementById('btnSound')
+};
+
+function updateHUD(){
+  ui.score.textContent = Math.floor(G.score).toLocaleString();
+  ui.presents.textContent = G.presents;
+  ui.kills.textContent = G.kills;
+  ui.dist.textContent = Math.floor(G.t) + ' m';
+  ui.speed.textContent = Math.round(G.speed*3.6) + ' km/h';
+}
+function updateCargoUI(){
+  ui.cargoTxt.textContent = G.cargo + ' / ' + CARGO_MAX;
+  ui.cargoFill.style.width = (100*G.cargo/CARGO_MAX) + '%';
+}
+// armour pips over the reticle — rebuilt only when the target or its health changes
+let _hpSig = '';
+function renderHpPips(p){
+  const sig = p.maxHp + ':' + p.hp;
+  if(sig === _hpSig) return;
+  _hpSig = sig;
+  let html = '';
+  for(let i=0;i<p.maxHp;i++) html += '<i class="'+(i < p.hp ? '' : 'spent')+'"></i>';
+  ui.hp.innerHTML = html;
+}
+let toastTimer = 0;
+function showToast(main, sub){
+  ui.toast.innerHTML = main + (sub ? '<small>'+sub+'</small>' : '');
+  ui.toast.classList.add('on');
+  toastTimer = 1.9;
+}
+
+function startGame(){
+  Sfx.init(); Sfx.resume();
+  if(G.state === 'ready' || G.state === 'over') resetGame();
+  G.state = 'playing';
+  ui.card.classList.remove('wrecked');
+  ui.overlay.classList.add('hidden');
+  ui.btnStart.disabled = true;
+  ui.btnPause.disabled = false;
+  ui.btnPause.textContent = 'Pause';
+  Sfx.whistle();
+  showToast('ALL ABOARD!', 'choose your track at the junctions');
+}
+function togglePause(){
+  if(G.state === 'playing'){
+    G.state = 'paused';
+    ui.btnPause.textContent = 'Resume';
+    ui.cardText.textContent = 'The Express is standing at the signal. Take a breath — your presents are safe in the wagons.';
+    ui.finalScore.style.display = 'block';
+    ui.finalScore.innerHTML = 'Score <b>'+Math.floor(G.score).toLocaleString()+'</b> &nbsp;&bull;&nbsp; '+G.presents+' presents &nbsp;&bull;&nbsp; '+Math.floor(G.t)+' m';
+    ui.btnGo.textContent = 'Resume Run';
+    ui.overlay.classList.remove('hidden');
+    ui.cardTitle.textContent = 'Signal Stop';
+    ui.cardSub.textContent = 'the express is waiting';
+  }else if(G.state === 'paused'){
+    G.state = 'playing';
+    ui.btnPause.textContent = 'Pause';
+    ui.overlay.classList.add('hidden');
+    Sfx.resume();
+  }
+}
+function hardReset(){
+  G.state = 'ready';
+  resetGame();
+  ui.btnStart.disabled = false;
+  ui.btnPause.disabled = true;
+  ui.btnPause.textContent = 'Pause';
+  ui.card.classList.remove('wrecked');
+  ui.cardTitle.innerHTML = 'Steamtrain&nbsp;3000';
+  ui.cardSub.textContent = 'The Christmas Express';
+  ui.cardText.textContent = 'Drive the Christmas Express through the winter night. Pick your path where the rails split, scoop up every present you can, and blast the thieves who come to rob your wagons. Boulders block a branch of every junction — hit one and the train is matchwood.';
+  ui.finalScore.style.display = 'none';
+  ui.btnGo.textContent = 'All Aboard';
+  ui.overlay.classList.remove('hidden');
+  ui.toast.classList.remove('on');
+}
+
+ui.btnGo.addEventListener('click', ()=> G.state === 'paused' ? togglePause() : startGame());
+ui.btnGo.addEventListener('click', ()=> document.getElementById('flash').classList.remove('bang'));
+ui.btnStart.addEventListener('click', startGame);
+ui.btnPause.addEventListener('click', togglePause);
+ui.btnReset.addEventListener('click', hardReset);
+ui.btnSound.addEventListener('click', ()=>{
+  Sfx.init();
+  Sfx.on = !Sfx.on;
+  ui.btnSound.innerHTML = Sfx.on ? '&#9835; On' : '&#9835; Off';
+});
+document.addEventListener('visibilitychange', ()=>{ if(document.hidden && G.state === 'playing') togglePause(); });
+
+/* =====================================================================
+   Main loop
+   ===================================================================== */
+const clock = new THREE.Clock();
+const CAM = { back: 43, height: 15.5, side: -7.5 };  // back + to one side: whole consist in a 3/4 view
+const camLook = new THREE.Vector3(0, 3, 14);
+let camX = 0, camLookX = 0, hudTimer = 0;
+
+function update(dt){
+  /* --- speed --- */
+  const target = Math.min(CFG.maxSpeed, CFG.baseSpeed + G.t*CFG.accelPerMetre);
+  G.speed += (target - G.speed) * Math.min(1, dt*1.2);
+  const prevT = G.t;
+  G.t += G.speed * dt;
+  G.score += G.speed * dt * 0.4;
+
+  /* --- extend / retire track --- */
+  while(track.tEnd < G.t + CFG.viewAhead) addSegment();
+  while(track.segs.length && track.segs[0].t1 < G.t - CFG.viewBehind){
+    const s = track.segs.shift();
+    disposeSegment(s);
+    if(s.props) s.props.forEach(p=> sceneryGroup.remove(p));
+  }
+
+  /* --- segment transitions --- */
+  const seg = segmentAt(G.t);
+  if(seg !== G.curSeg){
+    const prev = G.curSeg;
+    const n = seg.lanes.length;
+    if(n === 1){
+      G.laneIdx = 0;
+    }else if(prev && prev.lanes.length === n){
+      G.laneIdx = clamp(G.laneIdx, 0, n-1);
+    }else{
+      // fresh junction — default to the middle, then honour a queued nudge
+      G.laneIdx = n === 3 ? 1 : 0;
+      const age = performance.now()/1000 - G.pendingTime;
+      if(age < 1.4 && G.pendingDir !== 0)
+        G.laneIdx = clamp(G.laneIdx + G.pendingDir, 0, n-1);
+      G.pendingDir = 0; G.pendingTime = -99;
+    }
+    G.curSeg = seg;
+  }
+
+  const u = (G.t - seg.t0) / (seg.t1 - seg.t0);
+  G.canSwitch = seg.kind === 'split' && u < CFG.splitLockU;
+  // flash the arrows a little before the junction too, so there's time to react
+  const nextSeg = track.segs[track.segs.indexOf(seg)+1];
+  const junctionSoon = nextSeg && nextSeg.kind === 'split' && (nextSeg.t0 - G.t) < 48;
+  ui.choice.classList.toggle('on', G.state==='playing' && (G.canSwitch || junctionSoon));
+
+  /* --- lateral movement --- */
+  G.targetX = laneOffsetAt(seg, clamp(G.laneIdx,0,seg.lanes.length-1), u);
+  const maxStep = CFG.lateralSpeed * dt * (1 + G.speed/40);
+  const d = G.targetX - G.laneX;
+  G.laneX += clamp(d, -maxStep, maxStep);
+
+  const locoX = positionTrain(dt);
+
+  /* --- boulders: pulse the warning, then see if we ran into one --- */
+  const now = performance.now()/1000;
+  for(let i=hazards.length-1;i>=0;i--){
+    const h = hazards[i];
+    if(h.t < G.t - 40){ scene.remove(h.group); h.beam.material.dispose(); h.sign.material.dispose(); hazards.splice(i,1); continue; }
+    const pulse = 0.5 + 0.5*Math.sin(now*5 + h.phase);
+    h.beam.material.opacity = 0.17 + 0.28*pulse;
+    h.sign.rotation.y += dt*2.2;
+    h.sign.position.y = 4.6 + pulse*0.35;
+    h.sign.scale.setScalar(0.85 + pulse*0.3);
+    // Swept test: the loco's nose (~4 units ahead of G.t) travels prevT->G.t this frame.
+    // At 400 km/h a frame can cover several metres, so a point test would tunnel straight
+    // through the rock.
+    if(Math.abs(locoX - h.x) < 2.6 && G.t + 4.0 >= h.t - 1.6 && prevT + 4.0 <= h.t + 4.5){
+      crash(h);
+      return;
+    }
+  }
+
+  /* --- presents --- */
+  for(let i=presents.length-1;i>=0;i--){
+    const p = presents[i];
+    if(p.taken){ presents.splice(i,1); continue; }
+    if(p.t < G.t - 40){ scene.remove(p.group); p.spark.material.dispose(); p.beam.material.dispose(); presents.splice(i,1); continue; }
+    // idle animation — the beacon fades out as you close in on it
+    const bob = Math.sin(now*2.2 + p.phase);
+    p.box.position.y = bob*0.18;
+    p.box.rotation.y += dt*0.9;
+    p.spark.scale.setScalar(0.7 + bob*0.25);
+    const fade = clamp((p.t - G.t - 16) / 26, 0, 1);
+    p.beam.visible = fade > 0.03;
+    p.beam.material.opacity = (0.13 + 0.09*(1+bob)*0.5) * fade;
+    // collection
+    if(G.t >= p.t - 1.2 && G.t <= p.t + 3.0){
+      if(Math.abs(locoX - p.group.position.x) < 2.0) collectPresent(p);
+    }
+  }
+  if(G.comboTimer > 0){ G.comboTimer -= dt; if(G.comboTimer <= 0) G.combo = 0; }
+
+  /* --- flying presents --- */
+  for(let i=G.flying.length-1;i>=0;i--){
+    const f = G.flying[i];
+    f.t += dt;
+    const e = clamp(f.t/f.dur, 0, 1);
+    const ee = smooth(e);
+    f.m.position.lerpVectors(f.from, f.to, ee);
+    f.m.position.y += Math.sin(Math.PI*e) * f.arc;
+    f.m.rotation.y = lerp(f.rot0, f.rot1, ee) + (1-e)*8;
+    f.m.rotation.x = (1-ee) * f.tilt * 6;
+    f.m.rotation.z = f.tilt * ee;
+    if(e >= 1){ f.m.position.copy(f.to); f.m.rotation.x = 0; G.flying.splice(i,1); }
+  }
+  for(let i=G.dissolving.length-1;i>=0;i--){
+    const d = G.dissolving[i];
+    d.t += dt;
+    const e = clamp(d.t/d.dur,0,1);
+    d.m.scale.setScalar(d.s0*(1-e));
+    d.m.position.y += dt*4;
+    if(e>=1){ d.m.parent && d.m.parent.remove(d.m); G.dissolving.splice(i,1); }
+  }
+
+  /* --- smoke --- */
+  smokeTimer -= dt;
+  if(smokeTimer <= 0){
+    smokeTimer = clamp(0.15 - G.speed*0.0016, 0.045, 0.16);
+    const pf = smokePuffs[smokeIdx++ % smokePuffs.length];
+    loco.updateMatrixWorld();
+    pf.mesh.position.setFromMatrixPosition(loco.matrixWorld);
+    _v.set(0, 4.7, 3.05).applyMatrix4(loco.matrixWorld);
+    pf.mesh.position.copy(_v);
+    pf.mesh.visible = true;
+    pf.life = 0; pf.ttl = rand(0.9,1.4);
+    pf.vx = rand(-1.4,1.4); pf.vy = rand(8,12);
+    pf.mesh.material.opacity = 0.3;
+    pf.mesh.scale.setScalar(0.35);
+    pf.wreck = false;
+  }
+  /* --- thieves, gun and explosion effects --- */
+  updatePursuit(dt);
+  updateGun(dt);
+  updateEffects(dt);
+
+  /* --- world followers --- */
+  ground.position.set(pathX(G.t), -0.02, G.t + 260);
+  moonLight.position.set(locoX - 60, 90, G.t + 40);
+  moonLight.target.position.set(locoX, 0, G.t + 10);
+  warmFill.position.set(locoX, 6, G.t - 6);
+
+  /* --- camera --- */
+  camX += (locoX - camX) * Math.min(1, dt*2.6);
+  // aim at the middle of the consist, with a gentle lean into the coming curve
+  const lookTarget = pathX(G.t+6) + G.laneX + (pathX(G.t+45) - pathX(G.t))*0.22;
+  camLookX += (lookTarget - camLookX) * Math.min(1, dt*2.6);
+  const shake = G.speed > 40 ? (G.speed-40)*0.004 : 0;
+  // ease the 3/4 offset back towards centre on narrow (portrait) viewports
+  const side = CAM.side * clamp(camera.aspect/1.6, 0.3, 1);
+  camera.position.set(
+    camX + side + Math.sin(now*13)*shake,
+    CAM.height + Math.sin(now*17)*shake,
+    G.t - CAM.back);
+  camLook.set(camLookX, 3.5, G.t + 6);
+  camera.lookAt(camLook);
+
+  skyGroup.position.set(camera.position.x, 0, camera.position.z);
+
+  /* --- snow --- */
+  const arr = snowGeo.attributes.position.array;
+  const cx = camera.position.x, cz = camera.position.z;
+  for(let i=0;i<SNOW_N;i++){
+    arr[i*3+1] -= snowVel[i*2]*dt;
+    arr[i*3]   += snowVel[i*2+1]*dt;
+    if(arr[i*3+1] < 0) arr[i*3+1] += 90;
+    let dx = arr[i*3] - cx, dz = arr[i*3+2] - cz;
+    if(dx >  SNOW_BOX) arr[i*3]   -= SNOW_BOX*2;
+    if(dx < -SNOW_BOX) arr[i*3]   += SNOW_BOX*2;
+    if(dz >  SNOW_BOX) arr[i*3+2] -= SNOW_BOX*2;
+    if(dz < -SNOW_BOX) arr[i*3+2] += SNOW_BOX*2;
+  }
+  snowGeo.attributes.position.needsUpdate = true;
+
+  /* --- reticle: project the locked target onto the screen --- */
+  if(G.target && !G.target.dead){
+    if(ui.hp.style.display !== 'flex') ui.hp.style.display = 'flex';
+    camera.updateMatrixWorld();     // refresh matrixWorldInverse so projection isn't a frame behind
+    _v.copy(G.target.group.position); _v.y += 2.2;
+    _v.project(camera);
+    if(_v.z < 1 && Math.abs(_v.x) < 1.25 && Math.abs(_v.y) < 1.25){
+      ui.reticle.style.display = 'block';
+      ui.reticle.style.left = ((_v.x*0.5 + 0.5) * window.innerWidth) + 'px';
+      ui.reticle.style.top  = ((-_v.y*0.5 + 0.5) * window.innerHeight) + 'px';
+      renderHpPips(G.target);
+    } else ui.reticle.style.display = 'none';
+  } else if(ui.reticle.style.display !== 'none') ui.reticle.style.display = 'none';
+
+  if(toastTimer > 0){ toastTimer -= dt; if(toastTimer <= 0) ui.toast.classList.remove('on'); }
+
+  hudTimer += dt;
+  if(hudTimer > 0.1){ hudTimer = 0; updateHUD(); }
+}
+
+function animate(){
+  requestAnimationFrame(animate);
+  const dt = Math.min(clock.getDelta(), 0.05);
+  if(G.state === 'playing'){
+    update(dt);
+  }else{
+    // gentle idle drift so the title screen has life
+    const now = performance.now()/1000;
+    if(ui.reticle.style.display !== 'none') ui.reticle.style.display = 'none';
+    if(G.state === 'over') updateWreck(dt);
+    else skyGroup.position.set(camera.position.x, 0, camera.position.z);
+    if(G.state === 'ready'){
+      camera.position.set(pathX(0)+Math.sin(now*0.25)*6, 9.5, -30 + Math.sin(now*0.19)*4);
+      camera.lookAt(pathX(0), 3.0, 4);
+    }
+    const arr = snowGeo.attributes.position.array;
+    for(let i=0;i<SNOW_N;i++){
+      arr[i*3+1] -= snowVel[i*2]*dt*0.5;
+      if(arr[i*3+1] < 0) arr[i*3+1] += 90;
+    }
+    snowGeo.attributes.position.needsUpdate = true;
+  }
+  renderer.render(scene, camera);
+}
+
+window.addEventListener('resize', ()=>{
+  camera.aspect = window.innerWidth/window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+/* ---- debug handle (handy for tinkering from the console) ---- */
+window.STEAMTRAIN = {
+  G, track, cars, cargoSlots, presents, hazards, debris, pursuers, shells, CFG, CAM,
+  spawnPursuer, fireGun, camera, scene,
+  sim(seconds, step=1/60){ for(let i=0;i<Math.round(seconds/step);i++){ if(G.state!=='playing') break; update(step); } },
+  wreckSim(seconds, step=1/60){ for(let i=0;i<Math.round(seconds/step);i++) updateWreck(step); }
+};
+
+/* ---- go ---- */
+resetGame();
+camera.position.set(0, 9.5, -30);
+camera.lookAt(0, 3, 4);
+animate();
+</script>
+</body>
+</html>

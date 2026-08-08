@@ -1,16 +1,43 @@
 :root {
+  /* Orange theme on the portfolio aesthetic */
+  --bg: #fff6ef;
+  --bg-elevated: #ffffff;
+  --text: #2a160c;
+  --text-muted: #5c3a28;
+  --text-soft: #8a5a3d;
+  --border: rgba(154, 52, 18, 0.1);
+  --accent: #fd6116;
+  --accent-strong: #e04f0a;
+  --accent-soft: rgba(253, 97, 22, 0.14);
+  --gold: #ffb020;
+  --shadow-sm: 0 1px 2px rgba(120, 40, 8, 0.1);
+  --shadow-md:
+    0 0.6px 0.6px -1.25px rgba(120, 40, 8, 0.16),
+    0 2.3px 2.3px -2.5px rgba(120, 40, 8, 0.12),
+    0 6px 6px -3.75px rgba(120, 40, 8, 0.08);
+  --shadow-lg:
+    0 1px 2px rgba(120, 40, 8, 0.06),
+    0 8px 24px rgba(253, 97, 22, 0.12);
+  --radius-card: 24px;
+  --radius-sm: 12px;
+  --radius-pill: 999px;
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --duration: 260ms;
+  --nav-height: 72px;
+  --content-max: 1120px;
+
   font-family:
-    Inter,
+    'Satoshi',
     ui-sans-serif,
     system-ui,
     -apple-system,
     BlinkMacSystemFont,
-    "Segoe UI",
+    'Segoe UI',
     sans-serif;
-  line-height: 1.4;
+  line-height: 1.5;
   font-weight: 400;
-  color: #1b120b;
-  background-color: #fd6116;
+  color: var(--text);
+  background-color: var(--bg);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -21,11 +48,44 @@
   box-sizing: border-box;
 }
 
+html {
+  scroll-behavior: smooth;
+}
+
 body {
   margin: 0;
   min-height: 100vh;
+  background: var(--bg);
+  color: var(--text);
+}
+
+#root {
+  min-height: 100vh;
+}
+
+h1,
+h2,
+h3,
+h4,
+p {
+  margin: 0;
 }
 
 a {
   color: inherit;
+  text-decoration: none;
+}
+
+button {
+  font-family: inherit;
+}
+
+img {
+  display: block;
+  max-width: 100%;
+}
+
+::selection {
+  background: var(--accent-soft);
+  color: var(--text);
 }
